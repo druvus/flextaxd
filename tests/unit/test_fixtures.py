@@ -188,9 +188,9 @@ def mock_genome_directory(tmp_path):
 def expected_ncbi_formats():
     """Expected output formats for NCBI exporter."""
     return {
-        'nodes_root': "1\t|\t1\t|\troot\t|\t\t|\t0\t|\t1\t|\t1\t|\t1\t|\t1\t|\t1\t|\t1\t|\t1\t|\t\t|\n",
-        'nodes_bacteria': "2\t|\t1\t|\tsuperkingdom\t|\t\t|\t0\t|\t1\t|\t1\t|\t1\t|\t1\t|\t1\t|\t1\t|\t1\t|\t\t|\n",
-        'nodes_ecoli': "562\t|\t2\t|\tspecies\t|\t\t|\t0\t|\t1\t|\t1\t|\t1\t|\t1\t|\t1\t|\t1\t|\t1\t|\t\t|\n",
+        'nodes_root': "1\t|\t1\t|\tno rank\t|\t\t|\t0\t|\t1\t|\t1\t|\t1\t|\t1\t|\t1\t|\t0\t|\t0\t|\t\t|\n",
+        'nodes_bacteria': "2\t|\t1\t|\tsuperkingdom\t|\t\t|\t0\t|\t1\t|\t1\t|\t1\t|\t1\t|\t1\t|\t0\t|\t0\t|\t\t|\n",
+        'nodes_ecoli': "562\t|\t2\t|\tspecies\t|\t\t|\t0\t|\t1\t|\t1\t|\t1\t|\t1\t|\t1\t|\t0\t|\t0\t|\t\t|\n",
         'names_root': "1\t|\troot\t|\t\t|\tscientific name\t|\n",
         'names_bacteria': "2\t|\tBacteria\t|\t\t|\tscientific name\t|\n",
         'names_ecoli': "562\t|\tEscherichia coli\t|\t\t|\tscientific name\t|\n"
