@@ -46,7 +46,7 @@ class GanonExporter(DirectoryBasedExporter):
     
     @property
     def file_extensions(self) -> list[str]:
-        return [".dmp", ".txt", ".tax"]
+        return [".dmp", ".info", ".tax"]
     
     def export(self, tree: TaxonomyTree, output_path: Path, **kwargs: Any) -> None:
         """Export taxonomy tree in Ganon format.

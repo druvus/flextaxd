@@ -178,7 +178,7 @@ class TestProt2TaxidExporter:
         output_file = tmp_path / "prot2taxid.txt"
         exporter = Prot2TaxidExporter()
         
-        exporter.export(tree_with_genomes, output_file, include_genomes=True)
+        exporter.export(tree_with_genomes, output_file, include_genomes=True, sequence_filter='all')
         
         assert output_file.exists()
         content = output_file.read_text()
