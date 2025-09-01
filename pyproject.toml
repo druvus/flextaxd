@@ -28,12 +28,15 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 dependencies = [
-    "biopython>=1.80",
-    "matplotlib>=3.5.0",
     "inquirer>=3.0.0",
 ]
 
 [project.optional-dependencies]
+# Visualization dependencies for tree plotting and advanced output formats
+visualization = [
+    "biopython>=1.80",
+    "matplotlib>=3.5.0",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",

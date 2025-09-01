@@ -83,8 +83,10 @@ Examples:
         print("=" * 40)
         print(f"Total nodes: {stats['node_count']:,}")
         print(f"Total genomes: {stats['genome_count']:,}")
-        print(f"Root nodes: {stats['root_count']:,}")
-        print(f"Leaf nodes: {stats['leaf_count']:,}")
+        if 'root_count' in stats:
+            print(f"Root nodes: {stats['root_count']:,}")
+        if 'leaf_count' in stats:
+            print(f"Leaf nodes: {stats['leaf_count']:,}")
         
         if stats['rank_distribution']:
             print("\nRank Distribution:")
@@ -99,7 +101,7 @@ Examples:
             print(f"\nDatabase Metrics:")
             print("-" * 20)
             # Calculate some derived metrics
-            if stats['node_count'] > stats['leaf_count']:
+            if 'leaf_count' in stats and stats['node_count'] > stats['leaf_count']:
                 internal_nodes = stats['node_count'] - stats['leaf_count']
                 avg_children = stats['leaf_count'] / internal_nodes if internal_nodes > 0 else 0
                 print(f"Internal nodes: {internal_nodes:,}")
@@ -125,8 +127,10 @@ Examples:
         writer.writerow(['metric', 'value'])
         writer.writerow(['node_count', stats['node_count']])
         writer.writerow(['genome_count', stats['genome_count']])
-        writer.writerow(['root_count', stats['root_count']])
-        writer.writerow(['leaf_count', stats['leaf_count']])
+        if 'root_count' in stats:
+            writer.writerow(['root_count', stats['root_count']])
+        if 'leaf_count' in stats:
+            writer.writerow(['leaf_count', stats['leaf_count']])
         
         # Rank distribution
         if stats['rank_distribution']:

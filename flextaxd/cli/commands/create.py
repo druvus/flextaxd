@@ -222,8 +222,10 @@ Examples:
                 print(f"Created database: {args.database}")
                 print(f"  Nodes: {stats['node_count']}")
                 print(f"  Genomes: {stats['genome_count']}")
-                print(f"  Root nodes: {stats['root_count']}")
-                print(f"  Leaf nodes: {stats['leaf_count']}")
+                if 'root_count' in stats:
+                    print(f"  Root nodes: {stats['root_count']}")
+                if 'leaf_count' in stats:
+                    print(f"  Leaf nodes: {stats['leaf_count']}")
                 
                 if stats['rank_distribution']:
                     print("  Rank distribution:")

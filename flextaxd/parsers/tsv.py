@@ -110,10 +110,12 @@ class TSVTaxonomyParser(FileBasedParser):
             except IndexError as e:
                 raise ParseError(f"Line {line_num}: Column index error - {e}")
         
-        # Second pass: create nodes and relationships
+        # Second pass: create nodes, ensuring parents exist before children
         root_candidates: Set[str] = set()
         child_names: Set[str] = set()
+        relationships = []
         
+        # Collect all relationships
         for line_num, line in enumerate(lines[start_line:], start=start_line + 1):
             if not line.strip() or line.startswith('#'):
                 continue
@@ -134,33 +136,55 @@ class TSVTaxonomyParser(FileBasedParser):
                 rank_str = fields[rank_col].strip().lower()
                 rank = self._parse_rank(rank_str)
             
-            # Create parent node if it doesn't exist
-            if parent_id not in tree:
-                parent_node = TaxonomyNode(
-                    tax_id=parent_id,
-                    name=parent_name,
-                    rank=TaxonomicRank.CUSTOM,
-                    parent_id=None  # Will be set later if needed
-                )
-                try:
+            relationships.append((parent_name, child_name, parent_id, child_id, rank, line_num))
+            child_names.add(child_name)
+        
+        # Create nodes in dependency order
+        created_nodes = set()
+        remaining_relationships = relationships[:]
+        
+        while remaining_relationships:
+            progress_made = False
+            
+            for i, (parent_name, child_name, parent_id, child_id, rank, line_num) in enumerate(remaining_relationships):
+                # Create parent node if it doesn't exist and isn't in relationships (it's a root)
+                if parent_id not in tree and parent_name not in child_names:
+                    parent_node = TaxonomyNode(
+                        tax_id=parent_id,
+                        name=parent_name,
+                        rank=TaxonomicRank.CUSTOM,
+                        parent_id=None
+                    )
                     tree.add_node(parent_node)
                     root_candidates.add(parent_name)
-                except ValueError:
-                    pass  # Node already exists
+                    created_nodes.add(parent_id)
+                
+                # Try to create child node if parent exists
+                if parent_id in tree and child_id not in tree:
+                    child_node = TaxonomyNode(
+                        tax_id=child_id,
+                        name=child_name,
+                        rank=rank,
+                        parent_id=parent_id
+                    )
+                    try:
+                        tree.add_node(child_node)
+                        created_nodes.add(child_id)
+                        remaining_relationships.pop(i)
+                        progress_made = True
+                        break
+                    except ValueError as e:
+                        raise ParseError(f"Line {line_num}: Error creating child node - {e}")
             
-            # Create child node
-            if child_id not in tree:
-                child_node = TaxonomyNode(
-                    tax_id=child_id,
-                    name=child_name,
-                    rank=rank,
-                    parent_id=parent_id
-                )
-                try:
-                    tree.add_node(child_node)
-                    child_names.add(child_name)
-                except ValueError as e:
-                    raise ParseError(f"Line {line_num}: Error creating child node - {e}")
+            if not progress_made:
+                if remaining_relationships:
+                    # Find missing parents
+                    missing_parents = []
+                    for parent_name, child_name, parent_id, child_id, rank, line_num in remaining_relationships:
+                        if parent_id not in tree:
+                            missing_parents.append(f"{parent_name} (line {line_num})")
+                    raise ParseError(f"Cannot resolve dependencies. Missing parent nodes: {', '.join(missing_parents)}")
+                break
         
         # Handle root node detection
         self._handle_root_nodes(tree, root_candidates, child_names, node_name_to_id)

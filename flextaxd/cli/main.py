@@ -8,7 +8,7 @@ from pathlib import Path
 
 from ..core.exceptions import FlexTaxDError
 from ..utils.logging_config import setup_logging
-from .commands import CreateCommand, ModifyCommand, ExportCommand, StatsCommand
+from .commands import CreateCommand, ModifyCommand, ExportCommand, StatsCommand, VisualizeCommand
 from .commands.base import BaseCommand
 
 
@@ -23,6 +23,7 @@ Examples:
   flextaxd create --input taxonomy.tsv --database my_db.ftd
   flextaxd export --database my_db.ftd --format ncbi --output ./output/
   flextaxd stats --database my_db.ftd
+  flextaxd visualize --database my_db.ftd --type tree --max-depth 3
   flextaxd modify --database my_db.ftd --add-node "New Species" --parent-id 12345
 
 For more help on a specific command, use:
@@ -68,6 +69,7 @@ For more help on a specific command, use:
     ModifyCommand.register_parser(subparsers)
     ExportCommand.register_parser(subparsers)
     StatsCommand.register_parser(subparsers)
+    VisualizeCommand.register_parser(subparsers)
     
     return parser
 
@@ -101,6 +103,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             'modify': ModifyCommand,
             'export': ExportCommand,
             'stats': StatsCommand,
+            'visualize': VisualizeCommand,
         }
         
         command_class = command_classes[args.command]
