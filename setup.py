@@ -2,10 +2,10 @@ from setuptools import setup, find_packages
 # To use a consistent encoding
 from codecs import open
 from os import path
-from flextaxd.custom_taxonomy_databases import __version__
+from flextaxd import __version__
 
 import sys
-if sys.version_info.major < 3 and sys.version_info.minor < 5:
+if sys.version_info.major < 3 and sys.version_info.minor < 11:
     current_version = ".".join(map(str,[sys.version_info.major,sys.version_info.minor,sys.version_info.micro]))
     exit("This script only supports python versions 3.5 and above, please upgrade python! Current version: {python} ".format(python=current_version ))
 
@@ -52,7 +52,6 @@ setup(
     entry_points={
         'console_scripts': [
             'flextaxd=flextaxd.custom_taxonomy_databases:main',
-			'flextaxd-create=flextaxd.create_databases:main',
         ],
     },
 )
