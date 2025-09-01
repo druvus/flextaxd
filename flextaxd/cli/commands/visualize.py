@@ -522,9 +522,30 @@ Examples:
                 matplotlib.rcParams['font.size'] = args.label_size
             
             # Create the plot
+            ax = plt.gca()  # Get current axes
             Phylo.draw(phylo_tree, 
                       label_func=label_func,
-                      do_show=False)
+                      do_show=False,
+                      axes=ax)
+            
+            # Remove frame (spines) but keep x and y axes
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['bottom'].set_visible(True)
+            ax.spines['left'].set_visible(True)
+            
+            # Extend x-axis to accommodate label text
+            xlim = ax.get_xlim()
+            # Calculate maximum label length for padding
+            max_label_length = 0
+            for node in phylo_tree.find_clades():
+                if node.name:
+                    display_name = label_func(node)
+                    max_label_length = max(max_label_length, len(display_name))
+            
+            # Extend x-axis based on label length (approximate character width)
+            padding = max_label_length * 0.01  # Adjust multiplier as needed
+            ax.set_xlim(xlim[0], xlim[1] + padding)
             
             # Set title
             plt.title(f"Taxonomy Tree - Starting from: {start_node.name}", fontsize=14, fontweight='bold')
