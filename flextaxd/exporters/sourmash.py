@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any
 from pathlib import Path
 
 from .base import FileBasedExporter
-from ..core.models import TaxonomyTree, TaxNode
+from ..core.models import TaxonomyTree, TaxonomyNode
 from ..core.exceptions import ExportError
 from ..utils.logging_config import get_logger
 
@@ -136,7 +136,7 @@ class SourmashExporter(FileBasedExporter):
         
         return headers
     
-    def _build_lineage(self, tree: TaxonomyTree, node: TaxNode) -> Dict[str, str]:
+    def _build_lineage(self, tree: TaxonomyTree, node: TaxonomyNode) -> Dict[str, str]:
         """Build taxonomic lineage for a node."""
         lineage = {
             'superkingdom': '',

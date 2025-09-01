@@ -33,7 +33,7 @@ class TestCLIIntegration:
         ], capture_output=True, text=True)
         
         assert result.returncode == 0
-        assert result.stdout.strip() == "0.5.0"
+        assert result.stdout.strip() == "0.8.0"
     
     @pytest.mark.slow
     def test_basic_database_creation(self, sample_taxonomy_file: str):

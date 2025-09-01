@@ -55,7 +55,7 @@ Examples:
             type=str,
             choices=[
                 # Standard classifier formats
-                'ncbi', 'kraken2', 'ganon', 'centrifuge', 
+                'ncbi', 'kraken2', 'ganon', 'ganon2', 'centrifuge', 'sylph', 'diamond', 'melon', 'malt', 'kaiju', 'sourmash',
                 # Standard export formats
                 'tsv', 'newick', 'json',
                 # CreateTaxDB compatible formats
@@ -199,7 +199,14 @@ Examples:
         from ...exporters.ncbi import NCBIExporter
         from ...exporters.kraken2 import Kraken2Exporter
         from ...exporters.ganon import GanonExporter
+        from ...exporters.ganon2 import Ganon2Exporter
         from ...exporters.centrifuge import CentrifugeExporter
+        from ...exporters.sylph import SylphExporter
+        from ...exporters.diamond import DiamondExporter
+        from ...exporters.melon import MelonExporter
+        from ...exporters.malt import MALTExporter
+        from ...exporters.kaiju import KaijuExporter
+        from ...exporters.sourmash import SourmashExporter
         # CreateTaxDB compatible exporters
         from ...exporters.accession2taxid import Accession2TaxidExporter
         from ...exporters.nucl2taxid import Nucl2TaxidExporter
@@ -214,7 +221,14 @@ Examples:
             'ncbi': NCBIExporter,
             'kraken2': Kraken2Exporter,
             'ganon': GanonExporter,
+            'ganon2': Ganon2Exporter,
             'centrifuge': CentrifugeExporter,
+            'sylph': SylphExporter,
+            'diamond': DiamondExporter,
+            'melon': MelonExporter,
+            'malt': MALTExporter,
+            'kaiju': KaijuExporter,
+            'sourmash': SourmashExporter,
             # CreateTaxDB compatible formats
             'accession2taxid': Accession2TaxidExporter,
             'nucl2taxid': Nucl2TaxidExporter,
