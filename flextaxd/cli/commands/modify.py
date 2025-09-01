@@ -185,6 +185,10 @@ Examples:
         if args.rank:
             rank = TaxonomicRank(args.rank)
         
+        # Validate that node is not becoming its own parent
+        if args.parent_id == new_tax_id:
+            raise ValidationError(f"Cannot add node '{args.add_node}' (ID: {new_tax_id}) - would create circular reference (node as its own parent)")
+        
         # Create new node
         new_node = TaxonomyNode(
             tax_id=new_tax_id,
@@ -245,6 +249,10 @@ Examples:
             parent_node = repository.get_node(new_parent_id)
             if not parent_node:
                 raise ValidationError(f"New parent node {new_parent_id} does not exist")
+        
+        # Validate that node is not becoming its own parent
+        if new_parent_id == node.tax_id:
+            raise ValidationError(f"Cannot update node '{node.name}' (ID: {node.tax_id}) - would create circular reference (node as its own parent)")
         
         # Create updated node
         updated_node = TaxonomyNode(
@@ -377,6 +385,11 @@ Examples:
             
             if existing_node:
                 if args.replace:
+                    # Validate that node is not becoming its own parent
+                    if adjusted_parent_id == existing_node.tax_id:
+                        self.logger.error(f"Cannot replace node '{mod_node.name}' (ID: {existing_node.tax_id}) - would create circular reference (node as its own parent)")
+                        continue
+                    
                     # Update existing node
                     updated_node = TaxonomyNode(
                         tax_id=existing_node.tax_id,  # Keep original database ID
@@ -393,6 +406,11 @@ Examples:
                 # Add new node with a safe, non-conflicting ID
                 new_tax_id = next_available_id
                 next_available_id += 1
+                
+                # Validate that new node is not becoming its own parent
+                if adjusted_parent_id == new_tax_id:
+                    self.logger.error(f"Cannot add node '{mod_node.name}' (ID: {new_tax_id}) - would create circular reference (node as its own parent)")
+                    continue
                 
                 new_node = TaxonomyNode(
                     tax_id=new_tax_id,
