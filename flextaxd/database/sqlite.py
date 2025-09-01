@@ -136,13 +136,15 @@ class SQLiteTaxonomyRepository(TaxonomyRepository):
         tree = TaxonomyTree()
         
         try:
-            # Load all nodes ordered by parent_id (NULLs first for roots)
+            # Load all nodes first
             cursor = conn.execute("""
                 SELECT tax_id, name, rank, parent_id 
-                FROM nodes 
-                ORDER BY parent_id NULLS FIRST, tax_id
+                FROM nodes
             """)
             
+            # Create node objects
+            nodes = []
+            node_dict = {}
             for row in cursor:
                 rank = TaxonomicRank(row['rank']) if row['rank'] else TaxonomicRank.CUSTOM
                 node = TaxonomyNode(
@@ -151,6 +153,53 @@ class SQLiteTaxonomyRepository(TaxonomyRepository):
                     rank=rank,
                     parent_id=row['parent_id']
                 )
+                nodes.append(node)
+                node_dict[node.tax_id] = node
+            
+            # Sort nodes topologically: parents before children
+            def topological_sort(nodes):
+                # Separate roots and non-roots
+                roots = [node for node in nodes if node.parent_id is None]
+                non_roots = [node for node in nodes if node.parent_id is not None]
+                
+                # Build adjacency list of children for each parent
+                children_map = {}
+                for node in non_roots:
+                    parent_id = node.parent_id
+                    if parent_id not in children_map:
+                        children_map[parent_id] = []
+                    children_map[parent_id].append(node)
+                
+                # Perform depth-first traversal to get topological order
+                sorted_nodes = []
+                visited = set()
+                
+                def dfs(node):
+                    if node.tax_id in visited:
+                        return
+                    visited.add(node.tax_id)
+                    sorted_nodes.append(node)
+                    
+                    # Process children
+                    if node.tax_id in children_map:
+                        for child in children_map[node.tax_id]:
+                            dfs(child)
+                
+                # Start with roots
+                for root in roots:
+                    dfs(root)
+                
+                # Handle any orphaned nodes (nodes whose parents don't exist)
+                for node in nodes:
+                    if node.tax_id not in visited:
+                        sorted_nodes.append(node)
+                        visited.add(node.tax_id)
+                
+                return sorted_nodes
+            
+            # Sort nodes and add to tree
+            sorted_nodes = topological_sort(nodes)
+            for node in sorted_nodes:
                 tree.add_node(node)
             
             # Load genomes

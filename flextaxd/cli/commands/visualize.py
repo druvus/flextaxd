@@ -516,10 +516,14 @@ Examples:
                     
                 return name
             
+            # Set font size for labels if specified
+            if args.label_size > 0:
+                import matplotlib
+                matplotlib.rcParams['font.size'] = args.label_size
+            
             # Create the plot
             Phylo.draw(phylo_tree, 
                       label_func=label_func,
-                      label_size=args.label_size if args.label_size > 0 else None,
                       do_show=False)
             
             # Set title
