@@ -4,7 +4,14 @@ from .base import TaxonomyExporter
 from .ncbi import NCBIExporter
 from .kraken2 import Kraken2Exporter
 from .ganon import GanonExporter
+from .ganon2 import Ganon2Exporter
 from .centrifuge import CentrifugeExporter
+from .diamond import DiamondExporter
+from .kaiju import KaijuExporter
+from .malt import MALTExporter
+from .melon import MelonExporter
+from .sourmash import SourmashExporter
+from .sylph import SylphExporter
 
 # CreateTaxDB compatible exporters
 from .accession2taxid import Accession2TaxidExporter
@@ -19,7 +26,14 @@ __all__ = [
     "NCBIExporter", 
     "Kraken2Exporter", 
     "GanonExporter", 
+    "Ganon2Exporter",
     "CentrifugeExporter",
+    "DiamondExporter",
+    "KaijuExporter", 
+    "MALTExporter",
+    "MelonExporter",
+    "SourmashExporter",
+    "SylphExporter",
     # CreateTaxDB formats
     "Accession2TaxidExporter",
     "Nucl2TaxidExporter", 
