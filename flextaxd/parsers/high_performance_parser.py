@@ -5,7 +5,7 @@ import mmap
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
-from typing import Iterator, Dict, List, Tuple, Optional, Any, Protocol
+from typing import Iterator, Dict, List, Tuple, Optional, Any, Protocol, BinaryIO
 from pathlib import Path
 import tempfile
 import queue
@@ -67,18 +67,18 @@ class MemoryMappedFileReader:
     
     def __init__(self, file_path: Path):
         self.file_path = file_path
-        self._file = None
-        self._mmap = None
+        self._file: Optional[BinaryIO] = None
+        self._mmap: Optional[mmap.mmap] = None
         self.size = 0
         
-    def __enter__(self):
+    def __enter__(self) -> MemoryMappedFileReader:
         """Context manager entry."""
         self._file = open(self.file_path, 'rb')
         self._mmap = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
         self.size = len(self._mmap)
         return self
     
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager exit."""
         if self._mmap:
             self._mmap.close()
@@ -87,6 +87,9 @@ class MemoryMappedFileReader:
     
     def find_line_boundaries(self, num_chunks: int) -> List[Tuple[int, int]]:
         """Find line boundaries for splitting file into chunks."""
+        if self._mmap is None:
+            raise RuntimeError("File not opened - use as context manager")
+        
         if num_chunks <= 1:
             return [(0, self.size)]
         
@@ -241,12 +244,12 @@ class HighPerformanceNCBIParser:
         return results
     
     def _parse_compressed_parallel(self, file_path: Path, 
-                                  open_func) -> Iterator[ParsedNode]:
+                                  open_func: Any) -> Iterator[ParsedNode]:
         """Parallel parsing of compressed files using buffered approach."""
         buffer_size = 1024 * 1024  # 1MB buffer
-        line_queue: queue.Queue = queue.Queue(maxsize=10000)
+        line_queue: queue.Queue[Any] = queue.Queue(maxsize=10000)
         
-        def reader_thread():
+        def reader_thread() -> None:
             """Thread to read lines from compressed file."""
             try:
                 with open_func(file_path, 'rt', encoding='utf-8') as f:
@@ -398,7 +401,7 @@ class HighPerformanceNCBIParser:
         print(f"Parsing complete in {total_time:.2f}s")
         self._stats['parse_time'] = total_time
     
-    def _get_open_function(self, file_path: Path):
+    def _get_open_function(self, file_path: Path) -> Any:
         """Get appropriate open function based on file extension."""
         suffix = file_path.suffix.lower()
         
@@ -486,7 +489,7 @@ class HighPerformanceGenomeParser:
         except (ValueError, IndexError):
             return None
     
-    def _get_open_function(self, file_path: Path):
+    def _get_open_function(self, file_path: Path) -> Any:
         """Get appropriate open function based on file extension.""" 
         suffix = file_path.suffix.lower()
         
@@ -507,7 +510,7 @@ class ParallelFileProcessor:
         self.max_workers = max_workers or mp.cpu_count()
     
     def process_files_parallel(self, file_paths: List[Path], 
-                             processor_func,
+                             processor_func: Any,
                              use_processes: bool = False) -> Iterator[Any]:
         """Process multiple files in parallel."""
         ExecutorClass = ProcessPoolExecutor if use_processes else ThreadPoolExecutor
@@ -527,7 +530,7 @@ class ParallelFileProcessor:
                     continue
     
     def stream_process_large_file(self, file_path: Path,
-                                 line_processor,
+                                 line_processor: Any,
                                  batch_size: int = 10000) -> Iterator[Any]:
         """Stream process large file with batched parallel processing."""
         open_func = self._get_open_function(file_path)
@@ -570,7 +573,7 @@ class ParallelFileProcessor:
                 for result in self._process_chunk(batch, line_processor):
                     yield result
     
-    def _process_chunk(self, lines: List[str], line_processor) -> List[Any]:
+    def _process_chunk(self, lines: List[str], line_processor: Any) -> List[Any]:
         """Process a chunk of lines."""
         results = []
         
@@ -586,7 +589,7 @@ class ParallelFileProcessor:
         
         return results
     
-    def _get_open_function(self, file_path: Path):
+    def _get_open_function(self, file_path: Path) -> Any:
         """Get appropriate open function based on file extension."""
         suffix = file_path.suffix.lower()
         

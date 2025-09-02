@@ -1,6 +1,6 @@
 """Kraken2/KrakenUniq format exporter."""
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Set
 from pathlib import Path
 
 from .base import DirectoryBasedExporter
@@ -61,7 +61,7 @@ class Kraken2Exporter(DirectoryBasedExporter):
     def _write_names_file(self, tree: TaxonomyTree, output_path: Path, compress: bool) -> None:
         """Write NCBI names.dmp format file with proper escaping and validation."""
         # Track names for unique name generation
-        name_counts = {}
+        name_counts: Dict[str, int] = {}
         name_entries = []
         
         # First pass: collect all names and count duplicates
@@ -72,7 +72,7 @@ class Kraken2Exporter(DirectoryBasedExporter):
         
         # Second pass: write with proper unique names
         with open(output_path, 'w', encoding='utf-8', newline='\n') as f:
-            used_unique_names = set()
+            used_unique_names: Set[str] = set()
             for tax_id, escaped_name in name_entries:
                 # Generate unique name if duplicates exist
                 unique_name = self._generate_unique_name(
@@ -106,7 +106,7 @@ class Kraken2Exporter(DirectoryBasedExporter):
         # Ensure name is not empty after cleaning
         return escaped if escaped else "unnamed"
     
-    def _generate_unique_name(self, name: str, tax_id: int, name_counts: dict, used_unique_names: set) -> str:
+    def _generate_unique_name(self, name: str, tax_id: int, name_counts: Dict[str, int], used_unique_names: Set[str]) -> str:
         """Generate unique name for taxa when duplicates exist."""
         # If name is unique, no unique name needed (empty field)
         if name_counts.get(name, 0) <= 1:
@@ -162,7 +162,7 @@ class Kraken2Exporter(DirectoryBasedExporter):
             from ..utils.subprocess_utils import compress_file
             compress_file(output_path)
     
-    def _validate_parent_id(self, node, tree: TaxonomyTree) -> int:
+    def _validate_parent_id(self, node: Any, tree: TaxonomyTree) -> int:
         """Validate and return proper parent ID for node."""
         # Root nodes (tax_id=1) should have themselves as parent
         if node.tax_id == 1:
@@ -170,16 +170,16 @@ class Kraken2Exporter(DirectoryBasedExporter):
             
         # If no parent specified, this is a root node - use itself as parent
         if node.parent_id is None:
-            return node.tax_id
+            return int(node.tax_id)
             
         # Validate parent exists in tree
         if tree.get_node(node.parent_id) is None:
             logger.warning(f"Node {node.tax_id} references non-existent parent {node.parent_id}, using self as parent")
-            return node.tax_id
+            return int(node.tax_id)
             
-        return node.parent_id
+        return int(node.parent_id)
     
-    def _validate_rank(self, rank) -> str:
+    def _validate_rank(self, rank: Any) -> str:
         """Validate taxonomic rank for NCBI format."""
         if rank is None:
             return "no rank"

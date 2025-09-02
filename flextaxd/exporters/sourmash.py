@@ -1,7 +1,7 @@
 """Sourmash taxonomy format exporter for taxonomic classification."""
 
 import csv
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from pathlib import Path
 
 from .base import FileBasedExporter
@@ -151,10 +151,10 @@ class SourmashExporter(FileBasedExporter):
         
         # Get full lineage path
         lineage_nodes = []
-        current = node
+        current: Optional[TaxonomyNode] = node
         while current:
             lineage_nodes.append(current)
-            parent_id = tree.get_parent_id(current.tax_id)
+            parent_id = current.parent_id
             current = tree.get_node(parent_id) if parent_id else None
         
         # Reverse to get root-to-leaf order
@@ -162,7 +162,7 @@ class SourmashExporter(FileBasedExporter):
         
         # Map nodes to taxonomic ranks based on rank information
         for lineage_node in lineage_nodes:
-            rank = lineage_node.rank.lower() if lineage_node.rank else ''
+            rank = lineage_node.rank.value.lower() if lineage_node.rank else ''
             name = lineage_node.name
             
             if rank in lineage:
@@ -177,7 +177,7 @@ class SourmashExporter(FileBasedExporter):
         return lineage
     
     def _create_row_data(self, ident: str, lineage: Dict[str, str], 
-                        genome, include_strain: bool) -> list[str]:
+                        genome: Any, include_strain: bool) -> List[str]:
         """Create CSV row data for a genome."""
         row = [
             ident,

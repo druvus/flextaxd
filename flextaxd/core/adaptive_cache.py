@@ -4,7 +4,7 @@ from __future__ import annotations
 import threading
 import time
 import heapq
-from typing import Dict, Any, Optional, Tuple, Set, List, TypeVar, Generic
+from typing import Dict, Any, Optional, Tuple, Set, List, TypeVar, Generic, Callable
 from dataclasses import dataclass, field
 from collections import defaultdict, OrderedDict
 import weakref
@@ -25,7 +25,7 @@ class CacheEntry(Generic[T]):
     size_estimate: int = 0
     priority_score: float = 0.0
     
-    def update_access(self):
+    def update_access(self) -> None:
         """Update access statistics."""
         current_time = time.time()
         self.access_count += 1
@@ -77,7 +77,7 @@ class AdaptiveLRUCache(Generic[T]):
         self._lock = threading.RLock()
         
         # Adaptive sizing
-        self._hit_rates = []
+        self._hit_rates: List[float] = []
         self._last_resize = time.time()
         self._resize_interval = 60.0  # Resize every minute
     
@@ -146,7 +146,7 @@ class AdaptiveLRUCache(Generic[T]):
             time.time() - entry.last_access < 5  # Very recent access
         )
     
-    def _promote_to_hot(self, key: Any, entry: CacheEntry[T]):
+    def _promote_to_hot(self, key: Any, entry: CacheEntry[T]) -> None:
         """Promote entry from cold to hot cache."""
         # Remove from cold
         if key in self._cold_cache:
@@ -156,7 +156,7 @@ class AdaptiveLRUCache(Generic[T]):
         self._hot_cache[key] = entry
         self._hot_cache.move_to_end(key)
     
-    def _demote_to_cold(self, key: Any, entry: CacheEntry[T]):
+    def _demote_to_cold(self, key: Any, entry: CacheEntry[T]) -> None:
         """Demote entry from hot to cold cache."""
         # Remove from hot
         if key in self._hot_cache:
@@ -167,7 +167,7 @@ class AdaptiveLRUCache(Generic[T]):
         self._cold_cache.move_to_end(key)
         self._demotions += 1
     
-    def _maintain_size_limits(self):
+    def _maintain_size_limits(self) -> None:
         """Maintain cache size limits and manage hot/cold regions."""
         # Evict from hot cache if over limit
         while len(self._hot_cache) > self.hot_size:
@@ -191,7 +191,7 @@ class AdaptiveLRUCache(Generic[T]):
             key, _ = self._cold_cache.popitem(last=False)
             self._evictions += 1
     
-    def _maybe_resize_cache(self):
+    def _maybe_resize_cache(self) -> None:
         """Adaptively resize cache based on hit rate trends."""
         current_time = time.time()
         
@@ -258,7 +258,7 @@ class AdaptiveLRUCache(Generic[T]):
                 'cold_cache_usage': len(self._cold_cache) / self.cold_size * 100
             }
     
-    def clear(self):
+    def clear(self) -> None:
         """Clear cache and reset statistics."""
         with self._lock:
             self._hot_cache.clear()
@@ -274,7 +274,7 @@ class AdaptiveLRUCache(Generic[T]):
 class PredictiveCache:
     """Predictive cache that preloads likely-to-be-accessed items."""
     
-    def __init__(self, base_cache: AdaptiveLRUCache, prefetch_size: int = 100):
+    def __init__(self, base_cache: AdaptiveLRUCache[Any], prefetch_size: int = 100) -> None:
         self.base_cache = base_cache
         self.prefetch_size = prefetch_size
         
@@ -288,7 +288,7 @@ class PredictiveCache:
         self._prefetch_queue: Set[Any] = set()
         self._prefetch_lock = threading.Lock()
     
-    def get(self, key: Any, loader_func=None) -> Optional[T]:
+    def get(self, key: Any, loader_func: Optional[Callable[[Any], Optional[T]]] = None) -> Optional[T]:
         """Get with predictive prefetching."""
         # Track access pattern
         self._record_access(key)
@@ -307,7 +307,7 @@ class PredictiveCache:
         
         return result
     
-    def _record_access(self, key: Any):
+    def _record_access(self, key: Any) -> None:
         """Record access for pattern analysis."""
         self._access_history.append(key)
         
@@ -324,7 +324,7 @@ class PredictiveCache:
             if len(self._access_patterns[prev_key]) > 10:
                 self._access_patterns[prev_key] = self._access_patterns[prev_key][-5:]
     
-    def _maybe_prefetch(self, key: Any, loader_func):
+    def _maybe_prefetch(self, key: Any, loader_func: Optional[Callable[[Any], Optional[T]]]) -> None:
         """Predictively prefetch likely next accesses."""
         if not loader_func:
             return
@@ -339,7 +339,7 @@ class PredictiveCache:
                         # Start background prefetch
                         self._prefetch_queue.add(predicted_key)
                         
-                        def prefetch():
+                        def prefetch() -> None:
                             try:
                                 value = loader_func(predicted_key)
                                 if value is not None:
@@ -362,7 +362,7 @@ class PredictiveCache:
         # Get direct patterns for this key
         if key in self._access_patterns:
             # Sort by frequency
-            pattern_freq = defaultdict(int)
+            pattern_freq: Dict[Any, int] = defaultdict(int)
             for next_key in self._access_patterns[key]:
                 pattern_freq[next_key] += 1
             
@@ -385,7 +385,7 @@ class PredictiveCache:
         return self._prediction_success / self._prediction_attempts * 100
 
 
-class HierarchicalCache:
+class HierarchicalCache(Generic[T]):
     """Multi-level cache optimized for tree hierarchies."""
     
     def __init__(self, l1_size: int = 100, l2_size: int = 1000, l3_size: int = 10000):
@@ -396,7 +396,7 @@ class HierarchicalCache:
         self.l1_size = l1_size
         
         # L2: Medium cache with frequency tracking
-        self.l2_cache = AdaptiveLRUCache[T](l2_size)
+        self.l2_cache: AdaptiveLRUCache[T] = AdaptiveLRUCache[T](l2_size)
         
         # L3: Large cache for bulk storage
         self.l3_cache: OrderedDict[Any, T] = OrderedDict() 
@@ -440,13 +440,13 @@ class HierarchicalCache:
             self._misses += 1
             return None
     
-    def put(self, key: Any, value: T):
+    def put(self, key: Any, value: T) -> None:
         """Put into hierarchical cache."""
         with self._lock:
             # Always start in L1
             self._promote_to_l1(key, value)
     
-    def _promote_to_l1(self, key: Any, value: T):
+    def _promote_to_l1(self, key: Any, value: T) -> None:
         """Promote item to L1 cache."""
         # Remove from other levels
         if key in self.l3_cache:
@@ -466,7 +466,7 @@ class HierarchicalCache:
         """Get comprehensive cache statistics."""
         total_accesses = self._l1_hits + self._l2_hits + self._l3_hits + self._misses
         
-        stats = {
+        stats: Dict[str, Any] = {
             'l1_size': len(self.l1_cache),
             'l1_hits': self._l1_hits,
             'l1_hit_rate': self._l1_hits / total_accesses * 100 if total_accesses > 0 else 0,
@@ -495,15 +495,15 @@ class HierarchicalCache:
 class CacheWarmer:
     """Intelligent cache warming strategies for taxonomy trees."""
     
-    def __init__(self, tree, cache):
+    def __init__(self, tree: Any, cache: Any) -> None:
         self.tree = tree
         self.cache = cache
     
     def warm_by_access_patterns(self, access_log: List[int], 
-                              preload_factor: float = 2.0):
+                              preload_factor: float = 2.0) -> None:
         """Warm cache based on historical access patterns."""
         # Analyze access patterns
-        access_freq = defaultdict(int)
+        access_freq: Dict[int, int] = defaultdict(int)
         for node_id in access_log:
             access_freq[node_id] += 1
         
@@ -515,13 +515,13 @@ class CacheWarmer:
             if hasattr(self.tree, 'get_node'):
                 self.tree.get_node(node_id)  # Trigger cache loading
     
-    def warm_by_hierarchy_levels(self, max_depth: int = 5):
+    def warm_by_hierarchy_levels(self, max_depth: int = 5) -> None:
         """Warm cache by preloading upper hierarchy levels."""
         # Start from root and preload by levels
         if hasattr(self.tree, 'root_id') and self.tree.root_id:
             self._warm_subtree_bfs(self.tree.root_id, max_depth)
     
-    def _warm_subtree_bfs(self, root_id: int, max_depth: int):
+    def _warm_subtree_bfs(self, root_id: int, max_depth: int) -> None:
         """Warm cache using breadth-first traversal."""
         queue = [(root_id, 0)]
         
@@ -543,13 +543,13 @@ class CacheWarmer:
 
 
 def create_adaptive_cache(max_size: int = 1000, 
-                         hot_ratio: float = 0.3) -> AdaptiveLRUCache:
+                         hot_ratio: float = 0.3) -> AdaptiveLRUCache[Any]:
     """Factory function for adaptive cache."""
-    return AdaptiveLRUCache(max_size, hot_ratio)
+    return AdaptiveLRUCache[Any](max_size, hot_ratio)
 
 
 def create_hierarchical_cache(l1_size: int = 100, 
                              l2_size: int = 1000, 
-                             l3_size: int = 10000) -> HierarchicalCache:
+                             l3_size: int = 10000) -> HierarchicalCache[Any]:
     """Factory function for hierarchical cache."""
-    return HierarchicalCache(l1_size, l2_size, l3_size)
+    return HierarchicalCache[Any](l1_size, l2_size, l3_size)

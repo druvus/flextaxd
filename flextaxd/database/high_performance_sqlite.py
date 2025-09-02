@@ -51,7 +51,7 @@ class ConnectionPool:
         return conn
     
     @contextmanager
-    def get_connection(self):
+    def get_connection(self) -> Iterator[sqlite3.Connection]:
         """Get connection from pool."""
         if self._closed:
             raise DatabaseError("Connection pool is closed")
@@ -86,7 +86,7 @@ class ConnectionPool:
                     with self._lock:
                         self._active_connections -= 1
     
-    def close_all(self):
+    def close_all(self) -> None:
         """Close all connections in pool."""
         self._closed = True
         
@@ -119,7 +119,7 @@ class HighPerformanceTaxonomyDatabase:
         # Initialize schema and indexes
         self._initialize_schema()
     
-    def _initialize_schema(self):
+    def _initialize_schema(self) -> None:
         """Initialize optimized database schema."""
         with self.pool.get_connection() as conn:
             cursor = conn.cursor()
@@ -184,7 +184,7 @@ class HighPerformanceTaxonomyDatabase:
         # Prepare common statements
         self._prepare_statements()
     
-    def _prepare_statements(self):
+    def _prepare_statements(self) -> None:
         """Prepare commonly used SQL statements."""
         self._prepared_statements = {
             'get_node': "SELECT tax_id, name, rank, parent_id FROM nodes WHERE tax_id = ?",
@@ -272,7 +272,7 @@ class HighPerformanceTaxonomyDatabase:
     def _precompute_node_metadata(self, nodes: List[TaxonomyNode]) -> List[TaxonomyNode]:
         """Pre-compute lineage paths and depths for nodes."""
         # Build parent-child map
-        parent_map = {}
+        parent_map: Dict[int, List[int]] = {}
         node_map = {}
         
         for node in nodes:
@@ -286,14 +286,14 @@ class HighPerformanceTaxonomyDatabase:
         roots = [node for node in nodes if node.parent_id is None]
         
         # DFS to compute lineages and depths
-        def compute_metadata(node_id: int, lineage: List[str], depth: int):
+        def compute_metadata(node_id: int, lineage: List[str], depth: int) -> None:
             node = node_map.get(node_id)
             if not node:
                 return
             
             # Set metadata attributes
-            node._lineage_path = '|'.join(lineage + [node.name])
-            node._depth = depth
+            node._lineage_path = '|'.join(lineage + [node.name])  # type: ignore
+            node._depth = depth  # type: ignore
             
             # Recurse to children
             for child_id in parent_map.get(node_id, []):
@@ -514,7 +514,7 @@ class HighPerformanceTaxonomyDatabase:
             
             return {'node_count': 0, 'max_depth': 0, 'leaf_count': 0}
     
-    def create_database_backup(self, backup_path: str):
+    def create_database_backup(self, backup_path: str) -> None:
         """Create optimized database backup."""
         with self.pool.get_connection() as conn:
             # Use SQLite backup API for atomic backup
@@ -522,7 +522,7 @@ class HighPerformanceTaxonomyDatabase:
             conn.backup(backup_conn)
             backup_conn.close()
     
-    def optimize_database(self):
+    def optimize_database(self) -> None:
         """Run database optimization commands."""
         with self.pool.get_connection() as conn:
             print("Optimizing database...")
@@ -567,7 +567,7 @@ class HighPerformanceTaxonomyDatabase:
         
         return stats
     
-    def close(self):
+    def close(self) -> None:
         """Close database and cleanup resources."""
         self.pool.close_all()
 

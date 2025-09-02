@@ -35,7 +35,7 @@ class GanonExporter(DirectoryBasedExporter):
     - Taxonomy names must be properly escaped for special characters
     """
     
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._unique_names: Dict[str, int] = {}
         self._processed_names: Set[str] = set()
@@ -108,7 +108,7 @@ class GanonExporter(DirectoryBasedExporter):
     
     def _build_unique_names(self, tree: TaxonomyTree) -> None:
         """Build mapping of unique names to handle duplicates."""
-        name_counts = {}
+        name_counts: Dict[str, int] = {}
         
         # Count occurrences of each name
         for node in tree:
@@ -128,9 +128,9 @@ class GanonExporter(DirectoryBasedExporter):
             
             self._processed_names.add(unique_name)
     
-    def _get_unique_name(self, node) -> str:
+    def _get_unique_name(self, node: Any) -> str:
         """Get unique name for a node, handling duplicates."""
-        name = node.name.strip()
+        name = str(node.name).strip() if hasattr(node, 'name') and node.name else "unnamed"
         
         if name in self._unique_names and self._unique_names[name] > 0:
             # Find the correct unique name for this specific node
@@ -316,7 +316,7 @@ class GanonExporter(DirectoryBasedExporter):
         """Get sequence length for a genome."""
         # Try to get stored length if available
         if hasattr(genome, 'sequence_length') and genome.sequence_length and genome.sequence_length > 0:
-            return genome.sequence_length
+            return int(genome.sequence_length)
         
         # Try to estimate from file if available
         if hasattr(genome, 'file_path') and genome.file_path:
@@ -333,7 +333,7 @@ class GanonExporter(DirectoryBasedExporter):
                 pass
         
         # Default bacterial genome size
-        return 3_000_000
+        return int(3_000_000)
     
     def _get_assembly_id(self, genome: Any) -> str:
         """Get assembly ID for a genome."""

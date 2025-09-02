@@ -50,7 +50,7 @@ class CompressedNode:
 class StringInternPool:
     """Memory-efficient string storage using interning."""
     
-    def __init__(self):
+    def __init__(self) -> None:
         self._strings: List[str] = []
         self._string_to_id: Dict[str, int] = {}
     
@@ -80,7 +80,7 @@ class RangeMinimumQuery:
         """Initialize RMQ structure."""
         n = len(depths)
         if n == 0:
-            self.table = [[]]
+            self.table: List[List[int]] = [[]]
             return
             
         # Build sparse table for range minimum queries
@@ -178,12 +178,12 @@ class HighPerformanceTaxonomyTree:
         self._db_connections: Dict[int, sqlite3.Connection] = {}
         self._max_connections = min(32, mp.cpu_count() * 2)
         
-    def __enter__(self):
+    def __enter__(self) -> HighPerformanceTaxonomyTree:
         """Context manager entry."""
         self._thread_pool = ThreadPoolExecutor(max_workers=mp.cpu_count())
         return self
         
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager exit."""
         if self._thread_pool:
             self._thread_pool.shutdown()
@@ -202,7 +202,7 @@ class HighPerformanceTaxonomyTree:
                 self._db_connections[oldest_thread].close()
                 del self._db_connections[oldest_thread]
             
-            conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            conn = sqlite3.connect(self.db_path or '', check_same_thread=False)
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA synchronous=NORMAL") 
             conn.execute("PRAGMA cache_size=10000")
@@ -211,13 +211,13 @@ class HighPerformanceTaxonomyTree:
         
         return self._db_connections[thread_id]
     
-    def _cleanup_connections(self):
+    def _cleanup_connections(self) -> None:
         """Close all database connections."""
         for conn in self._db_connections.values():
             conn.close()
         self._db_connections.clear()
     
-    def load_from_database(self, batch_size: int = 10000):
+    def load_from_database(self, batch_size: int = 10000) -> None:
         """Load tree from database with optimized bulk operations."""
         if not self.db_path:
             raise ValueError("Database path not provided")
@@ -270,7 +270,7 @@ class HighPerformanceTaxonomyTree:
         self._preprocess_lca()
         self._stats['nodes_loaded'] = total_loaded
     
-    def _process_node_batch(self, batch: List[Tuple[int, str, str, Optional[int]]]):
+    def _process_node_batch(self, batch: List[Tuple[int, str, str, Optional[int]]]) -> None:
         """Process a batch of nodes efficiently."""
         with self._lock:
             for tax_id, name, rank, parent_id in batch:
@@ -303,7 +303,7 @@ class HighPerformanceTaxonomyTree:
                     self._children_index[parent_id].append(tax_id)
                     self._parent_index[tax_id] = parent_id
     
-    def _preprocess_lca(self):
+    def _preprocess_lca(self) -> None:
         """Preprocess tree for O(1) LCA queries using RMQ."""
         if self._lca_preprocessed:
             return
@@ -325,7 +325,7 @@ class HighPerformanceTaxonomyTree:
         self._first_occurrence.clear() 
         self._depth_array.clear()
         
-        def dfs(node_id: int, depth: int):
+        def dfs(node_id: int, depth: int) -> None:
             # Record first occurrence
             if node_id not in self._first_occurrence:
                 self._first_occurrence[node_id] = len(self._euler_tour)
@@ -387,6 +387,8 @@ class HighPerformanceTaxonomyTree:
             idx1, idx2 = idx2, idx1
         
         # Query RMQ for minimum depth in range
+        if self._rmq is None:
+            return None
         min_idx = self._rmq.query(idx1, idx2)
         if min_idx == -1:
             return None
@@ -430,12 +432,15 @@ class HighPerformanceTaxonomyTree:
                 raise ValidationError(f"Circular reference detected at {current}")
             visited.add(current)
             path.append(current)
-            current = self._parent_index.get(current)
+            parent = self._parent_index.get(current)
+            if parent is None:
+                break
+            current = parent
         
         return path
     
     def parallel_distance_matrix(self, node_ids: List[int], 
-                                max_workers: Optional[int] = None) -> np.ndarray:
+                                max_workers: Optional[int] = None) -> np.ndarray[Any, np.dtype[np.int32]]:
         """Compute distance matrix in parallel."""
         n = len(node_ids)
         distances = np.zeros((n, n), dtype=np.int32)
@@ -446,7 +451,7 @@ class HighPerformanceTaxonomyTree:
             for j in range(i + 1, n):
                 pairs.append((i, j, node_ids[i], node_ids[j]))
         
-        def compute_distance_chunk(chunk):
+        def compute_distance_chunk(chunk: List[Tuple[int, int, int, int]]) -> List[Tuple[int, int, int]]:
             results = []
             for i, j, node1, node2 in chunk:
                 lca = self.lowest_common_ancestor(node1, node2)
@@ -525,7 +530,11 @@ class HighPerformanceTaxonomyTree:
     
     def memory_usage_mb(self) -> float:
         """Get estimated memory usage in MB."""
-        return self.get_statistics()['estimated_memory_bytes'] / (1024 * 1024)
+        stats = self.get_statistics()
+        memory_bytes = stats['estimated_memory_bytes']
+        if isinstance(memory_bytes, (int, float)):
+            return float(memory_bytes) / (1024 * 1024)
+        return 0.0
 
 
 def create_high_performance_tree(db_path: str, 

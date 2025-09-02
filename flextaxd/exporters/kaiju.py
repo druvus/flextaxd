@@ -41,7 +41,7 @@ class KaijuExporter(DirectoryBasedExporter):
     - Direct use with pre-built Kaiju protein databases
     """
     
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._unique_names: Dict[str, int] = {}
         self._processed_names: Set[str] = set()
@@ -102,7 +102,7 @@ class KaijuExporter(DirectoryBasedExporter):
     
     def _build_unique_names(self, tree: TaxonomyTree) -> None:
         """Build mapping of unique names to handle duplicates."""
-        name_counts = {}
+        name_counts: Dict[str, int] = {}
         
         # Count occurrences of each name
         for node in tree:
@@ -122,9 +122,9 @@ class KaijuExporter(DirectoryBasedExporter):
             
             self._processed_names.add(unique_name)
     
-    def _get_unique_name(self, node) -> str:
+    def _get_unique_name(self, node: Any) -> str:
         """Get unique name for a node, handling duplicates."""
-        name = node.name.strip()
+        name = str(node.name).strip() if hasattr(node, 'name') and node.name else "unnamed"
         
         if name in self._unique_names and self._unique_names[name] > 0:
             # Find the correct unique name for this specific node

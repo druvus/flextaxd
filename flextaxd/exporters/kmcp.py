@@ -1,6 +1,6 @@
 """KMCP format exporter for nf-core createtaxdb compatibility."""
 
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Dict, Any, Callable, Union, IO
 from pathlib import Path
 
 from .base import FileBasedExporter
@@ -108,7 +108,7 @@ class KMCPExporter(FileBasedExporter):
             
             logger.info(f"Wrote {entries_written} reference-to-taxid mappings")
     
-    def _extract_reference_id(self, genome) -> str:
+    def _extract_reference_id(self, genome: Any) -> str:
         """Extract reference identifier from genome info.
         
         KMCP expects reference identifiers that match the genome file names.
@@ -124,20 +124,24 @@ class KMCPExporter(FileBasedExporter):
             Reference identifier string
         """
         # Priority 1: Assembly accession (RefSeq/GenBank format)
-        if genome.assembly_accession:
-            return genome.assembly_accession
+        if hasattr(genome, 'assembly_accession') and genome.assembly_accession:
+            return str(genome.assembly_accession)
         
         # Priority 2: Genome ID
-        if genome.genome_id:
-            return genome.genome_id
+        if hasattr(genome, 'genome_id') and genome.genome_id:
+            return str(genome.genome_id)
         
         # Priority 3: Fallback to any available ID
         if hasattr(genome, 'sequence_id') and genome.sequence_id:
-            return genome.sequence_id
+            return str(genome.sequence_id)
         
         # Last resort: use tax_id as reference (not ideal but functional)
-        logger.warning(f"No suitable reference ID found for genome in taxid {genome.tax_id}, using tax_id as reference")
-        return str(genome.tax_id)
+        if hasattr(genome, 'tax_id'):
+            logger.warning(f"No suitable reference ID found for genome in taxid {genome.tax_id}, using tax_id as reference")
+            return str(genome.tax_id)
+        
+        # Absolute fallback
+        return "unknown"
     
     def _get_open_function(self, compress: bool) -> Callable[..., Any]:
         """Get appropriate file opening function."""

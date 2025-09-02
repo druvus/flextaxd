@@ -1,13 +1,14 @@
 """Visualize command for displaying taxonomy trees."""
 
 import argparse
-from typing import Optional, Dict, Any, List, Set
+from typing import Optional, Dict, Any, List, Set, Union
 from pathlib import Path
 
 from .base import BaseCommand
 from ...core.exceptions import ValidationError, DatabaseError
 from ...core.models import TaxonomyNode
 from ...database.sqlite import SQLiteTaxonomyRepository
+from ...core.models import TaxonomyTree
 
 
 class VisualizeCommand(BaseCommand):
@@ -156,7 +157,7 @@ Examples:
             print(f"Database error: {e.message}")
             return 1
     
-    def _visualize_tree(self, tree, args: argparse.Namespace) -> None:
+    def _visualize_tree(self, tree: TaxonomyTree, args: argparse.Namespace) -> None:
         """Visualize taxonomy tree structure."""
         # Find starting node
         start_node = self._find_start_node(tree, args.start_node)
@@ -168,7 +169,7 @@ Examples:
         else:
             self._output_tree_text(tree, start_node, args)
     
-    def _visualize_summary(self, tree, args: argparse.Namespace) -> None:
+    def _visualize_summary(self, tree: TaxonomyTree, args: argparse.Namespace) -> None:
         """Visualize tree summary with key statistics."""
         # Find starting node
         start_node = self._find_start_node(tree, args.start_node)
@@ -180,7 +181,7 @@ Examples:
         else:
             self._output_summary_text(tree, start_node, args)
     
-    def _find_start_node(self, tree, start_identifier: str) -> Optional[TaxonomyNode]:
+    def _find_start_node(self, tree: TaxonomyTree, start_identifier: str) -> Optional[TaxonomyNode]:
         """Find starting node by name or ID."""
         # Try as taxonomy ID first
         try:
@@ -210,7 +211,7 @@ Examples:
         
         return None
     
-    def _output_tree_text(self, tree, start_node: TaxonomyNode, args: argparse.Namespace) -> None:
+    def _output_tree_text(self, tree: TaxonomyTree, start_node: TaxonomyNode, args: argparse.Namespace) -> None:
         """Output tree in text format."""
         print(f"Taxonomy Tree Visualization")
         print(f"{'=' * 50}")
@@ -221,7 +222,7 @@ Examples:
         
         self._print_tree_node(tree, start_node, args, depth=0, is_last_sibling=[])
     
-    def _print_tree_node(self, tree, node: TaxonomyNode, args: argparse.Namespace, 
+    def _print_tree_node(self, tree: TaxonomyTree, node: TaxonomyNode, args: argparse.Namespace, 
                          depth: int, is_last_sibling: List[bool]) -> None:
         """Recursively print tree nodes."""
         # Check depth limit
@@ -263,8 +264,11 @@ Examples:
         if not children:
             return
         
-        children_nodes = [tree.get_node(child_id) for child_id in children]
-        children_nodes = [n for n in children_nodes if n is not None]
+        children_nodes: List[TaxonomyNode] = []
+        for child_id in children:
+            child_node = tree.get_node(child_id)
+            if child_node is not None:
+                children_nodes.append(child_node)
         
         # Sort children by name
         children_nodes.sort(key=lambda n: n.name)
@@ -275,7 +279,7 @@ Examples:
             new_is_last_sibling = is_last_sibling + [is_last]
             self._print_tree_node(tree, child, args, depth + 1, new_is_last_sibling)
     
-    def _output_tree_json(self, tree, start_node: TaxonomyNode, args: argparse.Namespace) -> None:
+    def _output_tree_json(self, tree: TaxonomyTree, start_node: TaxonomyNode, args: argparse.Namespace) -> None:
         """Output tree in JSON format."""
         import json
         
@@ -296,8 +300,11 @@ Examples:
             if args.max_depth == 0 or current_depth < args.max_depth:
                 children = tree.get_children(node.tax_id)
                 if children:
-                    children_nodes = [tree.get_node(child_id) for child_id in children]
-                    children_nodes = [n for n in children_nodes if n is not None]
+                    children_nodes: List[TaxonomyNode] = []
+                    for child_id in children:
+                        child_node = tree.get_node(child_id)
+                        if child_node is not None:
+                            children_nodes.append(child_node)
                     children_nodes.sort(key=lambda n: n.name)
                     
                     node_dict['children'] = [
@@ -319,7 +326,7 @@ Examples:
         
         print(json.dumps(tree_data, indent=2))
     
-    def _output_summary_text(self, tree, start_node: TaxonomyNode, args: argparse.Namespace) -> None:
+    def _output_summary_text(self, tree: TaxonomyTree, start_node: TaxonomyNode, args: argparse.Namespace) -> None:
         """Output summary in text format."""
         # Count nodes in subtree
         subtree_nodes = self._count_subtree_nodes(tree, start_node, args.max_depth)
@@ -345,7 +352,7 @@ Examples:
             for rank, count in sorted(rank_counts.items(), key=lambda x: x[1], reverse=True):
                 print(f"  {rank}: {count}")
     
-    def _output_summary_json(self, tree, start_node: TaxonomyNode, args: argparse.Namespace) -> None:
+    def _output_summary_json(self, tree: TaxonomyTree, start_node: TaxonomyNode, args: argparse.Namespace) -> None:
         """Output summary in JSON format."""
         import json
         
@@ -371,7 +378,7 @@ Examples:
         
         print(json.dumps(summary_data, indent=2))
     
-    def _count_subtree_nodes(self, tree, node: TaxonomyNode, max_depth: int, current_depth: int = 0) -> int:
+    def _count_subtree_nodes(self, tree: TaxonomyTree, node: TaxonomyNode, max_depth: int, current_depth: int = 0) -> int:
         """Count nodes in subtree."""
         if max_depth > 0 and current_depth >= max_depth:
             return 0
@@ -386,7 +393,7 @@ Examples:
         
         return count
     
-    def _count_subtree_genomes(self, tree, node: TaxonomyNode, max_depth: int, current_depth: int = 0) -> int:
+    def _count_subtree_genomes(self, tree: TaxonomyTree, node: TaxonomyNode, max_depth: int, current_depth: int = 0) -> int:
         """Count genomes in subtree."""
         if max_depth > 0 and current_depth >= max_depth:
             return 0
@@ -401,13 +408,13 @@ Examples:
         
         return count
     
-    def _get_subtree_rank_distribution(self, tree, node: TaxonomyNode, max_depth: int, 
+    def _get_subtree_rank_distribution(self, tree: TaxonomyTree, node: TaxonomyNode, max_depth: int, 
                                      current_depth: int = 0) -> Dict[str, int]:
         """Get rank distribution in subtree."""
         if max_depth > 0 and current_depth >= max_depth:
             return {}
         
-        ranks = {}
+        ranks: Dict[str, int] = {}
         
         # Count current node
         rank_name = node.rank.value if node.rank else 'unknown'
@@ -424,7 +431,7 @@ Examples:
         
         return ranks
     
-    def _visualize_newick(self, tree, args: argparse.Namespace) -> None:
+    def _visualize_newick(self, tree: TaxonomyTree, args: argparse.Namespace) -> None:
         """Output tree in Newick format."""
         # Find starting node
         start_node = self._find_start_node(tree, args.start_node)
@@ -438,7 +445,7 @@ Examples:
             newick_string += ';'
         print(newick_string)
     
-    def _visualize_newick_ascii(self, tree, args: argparse.Namespace) -> None:
+    def _visualize_newick_ascii(self, tree: TaxonomyTree, args: argparse.Namespace) -> None:
         """Output tree using BioPython ASCII visualization."""
         try:
             from Bio import Phylo
@@ -458,7 +465,7 @@ Examples:
             newick_string += ';'
         
         try:
-            phylo_tree = Phylo.read(StringIO(newick_string), "newick")
+            phylo_tree = Phylo.read(StringIO(newick_string), "newick")  # type: ignore
             
             print(f"BioPython ASCII Tree Visualization")
             print(f"{'=' * 50}")
@@ -468,12 +475,12 @@ Examples:
             print()
             
             # Use BioPython's ASCII drawing
-            Phylo.draw_ascii(phylo_tree)
+            Phylo.draw_ascii(phylo_tree)  # type: ignore
             
         except Exception as e:
             raise ValidationError(f"Error parsing Newick tree with BioPython: {e}")
     
-    def _visualize_plot(self, tree, args: argparse.Namespace) -> None:
+    def _visualize_plot(self, tree: TaxonomyTree, args: argparse.Namespace) -> None:
         """Create graphical plot using matplotlib and BioPython."""
         try:
             from Bio import Phylo
@@ -499,13 +506,13 @@ Examples:
             newick_string += ';'
         
         try:
-            phylo_tree = Phylo.read(StringIO(newick_string), "newick")
+            phylo_tree = Phylo.read(StringIO(newick_string), "newick")  # type: ignore
             
             # Set up the plot
             plt.figure(figsize=(12, 8))
             
             # Customize label function
-            def label_func(node):
+            def label_func(node: Any) -> str:
                 if not node.name:
                     return ""
                 name = node.name
@@ -514,7 +521,7 @@ Examples:
                 if args.clip_labels and len(name) > 20:
                     name = name[:17] + "..."
                     
-                return name
+                return str(name)
             
             # Set font size for labels if specified
             if args.label_size > 0:
@@ -523,7 +530,7 @@ Examples:
             
             # Create the plot
             ax = plt.gca()  # Get current axes
-            Phylo.draw(phylo_tree, 
+            Phylo.draw(phylo_tree,  # type: ignore
                       label_func=label_func,
                       do_show=False,
                       axes=ax)
@@ -568,7 +575,7 @@ Examples:
         except Exception as e:
             raise ValidationError(f"Error creating tree plot: {e}")
     
-    def _generate_newick_string(self, tree, start_node, max_depth: int, current_depth: int = 0) -> str:
+    def _generate_newick_string(self, tree: TaxonomyTree, start_node: TaxonomyNode, max_depth: int, current_depth: int = 0) -> str:
         """Generate Newick format string for a subtree."""
         # Check depth limit
         if max_depth > 0 and current_depth >= max_depth:

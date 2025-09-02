@@ -157,24 +157,25 @@ class SQLiteTaxonomyRepository(TaxonomyRepository):
                 node_dict[node.tax_id] = node
             
             # Sort nodes topologically: parents before children
-            def topological_sort(nodes):
+            def topological_sort(nodes: List[TaxonomyNode]) -> List[TaxonomyNode]:
                 # Separate roots and non-roots
                 roots = [node for node in nodes if node.parent_id is None]
                 non_roots = [node for node in nodes if node.parent_id is not None]
                 
                 # Build adjacency list of children for each parent
-                children_map = {}
+                children_map: Dict[int, List[TaxonomyNode]] = {}
                 for node in non_roots:
                     parent_id = node.parent_id
-                    if parent_id not in children_map:
-                        children_map[parent_id] = []
-                    children_map[parent_id].append(node)
+                    if parent_id is not None:
+                        if parent_id not in children_map:
+                            children_map[parent_id] = []
+                        children_map[parent_id].append(node)
                 
                 # Perform depth-first traversal to get topological order
                 sorted_nodes = []
                 visited = set()
                 
-                def dfs(node):
+                def dfs(node: TaxonomyNode) -> None:
                     if node.tax_id in visited:
                         return
                     visited.add(node.tax_id)

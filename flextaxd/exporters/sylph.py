@@ -21,7 +21,7 @@ from pathlib import Path
 import re
 
 from .base import DirectoryBasedExporter
-from ..core.models import TaxonomyTree, TaxonomicRank
+from ..core.models import TaxonomyTree, TaxonomicRank, TaxonomyNode
 from ..core.exceptions import ExportError, ValidationError
 from ..utils.logging_config import get_logger
 
@@ -46,7 +46,7 @@ class SylphExporter(DirectoryBasedExporter):
     - Metagenomics profiling pipelines
     """
     
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._unique_names: Dict[str, int] = {}
         self._processed_names: Set[str] = set()
@@ -124,7 +124,7 @@ class SylphExporter(DirectoryBasedExporter):
     
     def _build_unique_names(self, tree: TaxonomyTree) -> None:
         """Build mapping of unique names to handle duplicates."""
-        name_counts = {}
+        name_counts: Dict[str, int] = {}
         
         # Count occurrences of each name
         for node in tree:
@@ -145,7 +145,7 @@ class SylphExporter(DirectoryBasedExporter):
             self._node_name_mapping[node.tax_id] = unique_name
             self._processed_names.add(unique_name)
     
-    def _get_unique_name(self, node) -> str:
+    def _get_unique_name(self, node: TaxonomyNode) -> str:
         """Get unique name for a node, handling duplicates."""
         # Use the pre-computed unique name mapping
         return self._node_name_mapping.get(node.tax_id, node.name.strip())
