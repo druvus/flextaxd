@@ -5,6 +5,7 @@ from .registry import ParserRegistry
 from .tsv import TSVTaxonomyParser
 from .ncbi import NCBITaxonomyParser
 from .qiime import QIIMETaxonomyParser
+from .gtdb import GTDBTaxonomyParser
 from .silva import SILVATaxonomyParser
 from .cansnper import CanSNPerTaxonomyParser
 
@@ -14,6 +15,7 @@ __all__ = [
     "TSVTaxonomyParser",
     "NCBITaxonomyParser", 
     "QIIMETaxonomyParser",
+    "GTDBTaxonomyParser",
     "SILVATaxonomyParser",
     "CanSNPerTaxonomyParser"
 ]

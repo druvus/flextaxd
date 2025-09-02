@@ -47,11 +47,35 @@ class TSVTaxonomyParser(FileBasedParser):
             has_parent_child = (
                 ('parent' in columns and 'child' in columns) or
                 ('parent_name' in columns and 'child_name' in columns) or
-                ('parent_id' in columns and 'child_id' in columns) or
-                len(columns) >= 2  # At least two columns for basic parent-child
+                ('parent_id' in columns and 'child_id' in columns)
             )
             
-            return has_parent_child
+            # If we have explicit parent/child headers, this is likely TSV format
+            if has_parent_child:
+                return True
+            
+            # For files without headers, check if it looks like simple parent-child data
+            # But exclude GTDB format (which has genome IDs and semicolon taxonomy strings)
+            if len(columns) >= 2 and len(lines) > 1:
+                # Check second line (first data line) to see if it looks like GTDB
+                second_line = lines[1] if len(lines) > 1 else first_line
+                parts = second_line.split('\t')
+                
+                if len(parts) >= 2:
+                    # If second column contains GTDB-style taxonomy (with d__, p__, etc.), skip it
+                    if ';' in parts[1] and any(prefix in parts[1] for prefix in ['d__', 'p__', 'c__', 'o__', 'f__', 'g__', 's__']):
+                        return False
+                    
+                    # If first column looks like a GTDB genome ID, skip it
+                    genome_id = parts[0]
+                    if (genome_id.startswith('GB_GC') or genome_id.startswith('RS_GC') or 
+                        genome_id.startswith('UBA') or '.' in genome_id):
+                        return False
+                    
+                    # Otherwise, assume it's a simple TSV parent-child format
+                    return True
+            
+            return False
             
         except Exception:
             return False

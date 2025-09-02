@@ -147,12 +147,12 @@ Examples:
             # Register all parsers
             from ...parsers import (
                 TSVTaxonomyParser, NCBITaxonomyParser, QIIMETaxonomyParser, 
-                SILVATaxonomyParser, CanSNPerTaxonomyParser
+                GTDBTaxonomyParser, SILVATaxonomyParser, CanSNPerTaxonomyParser
             )
             
             parser_classes = [
                 TSVTaxonomyParser, NCBITaxonomyParser, QIIMETaxonomyParser,
-                SILVATaxonomyParser, CanSNPerTaxonomyParser
+                GTDBTaxonomyParser, SILVATaxonomyParser, CanSNPerTaxonomyParser
             ]
             
             for parser_class in parser_classes:
@@ -172,11 +172,8 @@ Examples:
                     raise ValidationError(f"Cannot auto-detect format for: {args.input}")
                 self.logger.info(f"Auto-detected format: {parser.parser_name}")
             else:
-                # Handle format aliases
-                format_map = {
-                    'gtdb': 'qiime',  # GTDB uses QIIME format
-                }
-                actual_format = format_map.get(args.format, args.format)
+                # Use format directly - no more aliases needed with proper GTDB parser
+                actual_format = args.format
                 
                 try:
                     parser = registry.get_parser(actual_format)
