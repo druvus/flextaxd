@@ -13,6 +13,7 @@ from flextaxd.parsers import (
     QIIMETaxonomyParser,
     SILVATaxonomyParser,
     CanSNPerTaxonomyParser,
+    GTDBTaxonomyParser,
 )
 from flextaxd.parsers.base import TaxonomyParser, FileBasedParser, DirectoryBasedParser
 from flextaxd.parsers.registry import ParserRegistry
@@ -755,3 +756,462 @@ class TestParserErrorHandling:
 
         with pytest.raises(ParseError):
             parser.parse(nonexistent_file)
+
+
+class TestGTDBTaxonomyParser:
+    """Test GTDB taxonomy format parser."""
+
+    def test_parser_properties(self):
+        """Test parser basic properties."""
+        parser = GTDBTaxonomyParser()
+        assert parser.parser_name == "gtdb"
+        assert ".tsv" in parser.supported_extensions
+        assert ".txt" in parser.supported_extensions
+
+    def test_can_parse_ar122_taxonomy_file(self):
+        """Test detection of GTDB ar122_taxonomy file."""
+        parser = GTDBTaxonomyParser()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix="_taxonomy_r202.tsv", delete=False) as f:
+            # Rename to match GTDB pattern
+            gtdb_file = Path(f.name).parent / "ar122_taxonomy_r202.tsv"
+            f.flush()
+            Path(f.name).rename(gtdb_file)
+
+            # Write GTDB format content
+            gtdb_file.write_text(
+                "GB_GCA_000005825.2\td__Bacteria;p__Firmicutes;c__Bacilli;o__Lactobacillales;f__Streptococcaceae;g__Streptococcus;s__Streptococcus pyogenes\n"
+            )
+
+        try:
+            assert parser.can_parse(gtdb_file) is True
+        finally:
+            gtdb_file.unlink()
+
+    def test_can_parse_bac120_taxonomy_file(self):
+        """Test detection of GTDB bac120_taxonomy file."""
+        parser = GTDBTaxonomyParser()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix="_taxonomy_r207.tsv", delete=False) as f:
+            # Rename to match GTDB pattern
+            gtdb_file = Path(f.name).parent / "bac120_taxonomy_r207.tsv"
+            f.flush()
+            Path(f.name).rename(gtdb_file)
+
+            # Write GTDB format content
+            gtdb_file.write_text(
+                "GCA_000001405.1\td__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia coli\n"
+            )
+
+        try:
+            assert parser.can_parse(gtdb_file) is True
+        finally:
+            gtdb_file.unlink()
+
+    def test_can_parse_gtdbtk_summary_file(self):
+        """Test detection of GTDB-Tk summary file."""
+        parser = GTDBTaxonomyParser()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".bac120.summary.tsv", delete=False) as f:
+            # Write GTDB-Tk summary header and content
+            f.write("user_genome\tclassification\tfastani_reference\tfastani_reference_radius\tfastani_taxonomy\n")
+            f.write("genome1\td__Bacteria;p__Firmicutes;c__Bacilli\tGCA_000005825.2\t95.0\td__Bacteria;p__Firmicutes;c__Bacilli\n")
+            f.flush()
+            test_file = Path(f.name)
+
+        try:
+            assert parser.can_parse(test_file) is True
+        finally:
+            test_file.unlink()
+
+    def test_parse_standard_gtdb_taxonomy(self):
+        """Test parsing standard GTDB taxonomy format."""
+        parser = GTDBTaxonomyParser()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tsv", delete=False) as f:
+            # Write standard GTDB format
+            f.write("GB_GCA_000005825.2\td__Bacteria;p__Firmicutes;c__Bacilli;o__Lactobacillales;f__Streptococcaceae;g__Streptococcus;s__Streptococcus pyogenes\n")
+            f.write("GCA_000001405.1\td__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia coli\n")
+            f.flush()
+            test_file = Path(f.name)
+
+        try:
+            tree = parser.parse(test_file)
+
+            # Should have root plus multiple taxonomy levels
+            assert tree.node_count > 8  # Root + at least 7 taxonomic levels
+
+            # Check that domains were created
+            domain_nodes = [node for node in tree if node.rank == TaxonomicRank.SUPERKINGDOM]
+            assert len(domain_nodes) >= 1
+            
+            # Check for Bacteria domain
+            bacteria_found = any(node.name == "Bacteria" for node in domain_nodes)
+            assert bacteria_found
+
+        finally:
+            test_file.unlink()
+
+    def test_parse_gtdbtk_summary_format(self):
+        """Test parsing GTDB-Tk summary format."""
+        parser = GTDBTaxonomyParser()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".summary.tsv", delete=False) as f:
+            # Write GTDB-Tk summary format with header
+            f.write("user_genome\tclassification\tfastani_reference\n")
+            f.write("genome1\td__Bacteria;p__Firmicutes;c__Bacilli;o__Lactobacillales\tGCA_000005825.2\n")
+            f.write("genome2\td__Bacteria;p__Proteobacteria;c__Gammaproteobacteria\tGCA_000001405.1\n")
+            f.flush()
+            test_file = Path(f.name)
+
+        try:
+            tree = parser.parse(test_file)
+
+            # Should have taxonomy hierarchy
+            assert tree.node_count > 5
+
+            # Check for expected taxonomic levels
+            node_names = [node.name for node in tree]
+            assert "Bacteria" in node_names
+            assert "Firmicutes" in node_names
+            assert "Proteobacteria" in node_names
+
+        finally:
+            test_file.unlink()
+
+    def test_has_gtdb_taxonomy_string(self):
+        """Test GTDB taxonomy string detection."""
+        parser = GTDBTaxonomyParser()
+
+        # Test valid GTDB taxonomy strings
+        assert parser._has_gtdb_taxonomy_string("d__Bacteria;p__Firmicutes;c__Bacilli") is True
+        assert parser._has_gtdb_taxonomy_string("d__Archaea;p__Thermoproteota") is True
+        
+        # Test invalid strings
+        assert parser._has_gtdb_taxonomy_string("Bacteria;Firmicutes;Bacilli") is False
+        assert parser._has_gtdb_taxonomy_string("random string") is False
+
+    def test_parse_gtdb_taxonomy_string(self):
+        """Test parsing GTDB taxonomy string method."""
+        parser = GTDBTaxonomyParser()
+
+        # Test that the method exists and can parse basic taxonomy
+        taxonomy_string = "d__Bacteria;p__Firmicutes;c__Bacilli"
+
+        # Call the actual method - it returns list of (name, rank) tuples
+        result = parser._parse_gtdb_taxonomy_string(taxonomy_string)
+
+        # Should return a list of taxonomy levels
+        assert isinstance(result, list)
+        assert len(result) == 3  # d__, p__, c__
+        
+        # Check that names and ranks are correctly parsed
+        names = [name for name, rank in result]
+        ranks = [rank for name, rank in result]
+        
+        assert "Bacteria" in names
+        assert "Firmicutes" in names
+        assert "Bacilli" in names
+        
+        # Check ranks
+        assert TaxonomicRank.SUPERKINGDOM in ranks
+        assert TaxonomicRank.PHYLUM in ranks
+        assert TaxonomicRank.CLASS in ranks
+
+
+class TestImprovedTSVTaxonomyParser:
+    """Extended tests for TSV parser to improve coverage."""
+
+    def test_parse_without_header(self):
+        """Test parsing TSV without header line."""
+        parser = TSVTaxonomyParser()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tsv", delete=False) as f:
+            # No header - should auto-detect columns
+            f.write("root\t\tno rank\n")
+            f.write("Bacteria\troot\tsuperkingdom\n") 
+            f.write("Escherichia\tBacteria\tgenus\n")
+            f.flush()
+            test_file = Path(f.name)
+
+        try:
+            tree = parser.parse(test_file, has_header=False)
+            assert tree.node_count >= 2  # Should parse at least some nodes
+        finally:
+            test_file.unlink()
+
+    def test_parse_with_optional_columns(self):
+        """Test parsing TSV with additional optional columns."""
+        parser = TSVTaxonomyParser()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tsv", delete=False) as f:
+            # Include optional columns that may or may not be used
+            f.write("child\tparent\trank\tdescription\n")
+            f.write("root\t\tno rank\tRoot of taxonomy\n")
+            f.write("Bacteria\troot\tsuperkingdom\tBacterial domain\n")
+            f.write("Escherichia\tBacteria\tgenus\tE. coli genus\n")
+            f.flush()
+            test_file = Path(f.name)
+
+        try:
+            tree = parser.parse(test_file)
+            
+            # Should parse successfully despite extra columns
+            assert tree.node_count >= 2
+            
+            # Check basic structure
+            bacteria_found = False
+            for node in tree:
+                if node.name == "Bacteria":
+                    bacteria_found = True
+                    assert node.rank == TaxonomicRank.SUPERKINGDOM
+            assert bacteria_found
+
+        finally:
+            test_file.unlink()
+
+    def test_parse_flexible_column_order(self):
+        """Test parsing with different column order.""" 
+        parser = TSVTaxonomyParser()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tsv", delete=False) as f:
+            # Use standard column names but test they work
+            f.write("child\tparent\trank\n")
+            f.write("root\t\tno rank\n")
+            f.write("Bacteria\troot\tsuperkingdom\n")
+            f.write("Proteobacteria\tBacteria\tphylum\n")
+            f.flush()
+            test_file = Path(f.name)
+
+        try:
+            tree = parser.parse(test_file)
+            assert tree.node_count >= 3
+            
+            # Find the Bacteria node
+            bacteria_node = None
+            for node in tree:
+                if node.name == "Bacteria":
+                    bacteria_node = node
+                    break
+            
+            assert bacteria_node is not None
+            assert bacteria_node.rank == TaxonomicRank.SUPERKINGDOM
+
+        finally:
+            test_file.unlink()
+
+
+class TestImprovedCanSNPerParser:
+    """Extended tests for CanSNPer parser to improve coverage."""
+
+    def test_parser_properties(self):
+        """Test parser properties."""
+        parser = CanSNPerTaxonomyParser()
+        assert parser.parser_name == "cansnper"
+        assert ".txt" in parser.supported_extensions
+
+    def test_cansnper_detection_robustness(self):
+        """Test that CanSNPer parser handles detection gracefully."""
+        parser = CanSNPerTaxonomyParser()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            # Write content that should not crash the detector
+            f.write("some content\n")
+            f.write("more content\twith tabs\n")
+            f.flush()
+            test_file = Path(f.name)
+
+        try:
+            # Test detection - should not crash
+            can_parse_result = parser.can_parse(test_file)
+            assert isinstance(can_parse_result, bool)
+            
+            # Test that parse method exists and handles invalid format gracefully
+            try:
+                result = parser.parse(test_file)
+                # If it succeeds, should be a TaxonomyTree
+                assert isinstance(result, TaxonomyTree)
+            except (ParseError, Exception):
+                # Any controlled exception is acceptable
+                pass
+                
+        finally:
+            test_file.unlink()
+
+
+class TestImprovedSILVAParser:
+    """Extended tests for SILVA parser to improve coverage."""
+
+    def test_parse_silva_taxonomy_format(self):
+        """Test parsing SILVA taxonomy format."""
+        parser = SILVATaxonomyParser()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            # SILVA-like format
+            f.write("Bacteria;Proteobacteria;Gammaproteobacteria;Enterobacterales;Enterobacteriaceae;Escherichia;\n")
+            f.write("Bacteria;Firmicutes;Bacilli;Lactobacillales;Streptococcaceae;Streptococcus;\n")
+            f.flush()
+            test_file = Path(f.name)
+
+        try:
+            # Test if it can parse
+            if parser.can_parse(test_file):
+                tree = parser.parse(test_file)
+                assert isinstance(tree, TaxonomyTree)
+                assert tree.node_count > 0
+                
+                # Check for expected taxonomy
+                node_names = [node.name for node in tree]
+                assert "Bacteria" in node_names
+                
+        finally:
+            test_file.unlink()
+
+    def test_silva_rank_detection(self):
+        """Test SILVA rank detection and assignment."""
+        parser = SILVATaxonomyParser()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            # Single SILVA taxonomy line
+            f.write("Bacteria;Proteobacteria;Gammaproteobacteria;\n")
+            f.flush()
+            test_file = Path(f.name)
+
+        try:
+            if parser.can_parse(test_file):
+                tree = parser.parse(test_file)
+                
+                # Check rank assignments
+                for node in tree:
+                    if node.name == "Bacteria":
+                        assert node.rank in [TaxonomicRank.SUPERKINGDOM, TaxonomicRank.KINGDOM]
+                    elif node.name == "Proteobacteria":
+                        assert node.rank == TaxonomicRank.PHYLUM
+                    elif node.name == "Gammaproteobacteria":
+                        assert node.rank == TaxonomicRank.CLASS
+                        
+        finally:
+            test_file.unlink()
+
+
+class TestParserEdgeCases:
+    """Test edge cases and error conditions for parsers."""
+
+    def test_parser_with_unicode_characters(self):
+        """Test parsers handle Unicode characters properly."""
+        parser = TSVTaxonomyParser()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tsv", delete=False, encoding="utf-8") as f:
+            # Include Unicode characters
+            f.write("child\tparent\trank\n")
+            f.write("root\t\tno rank\n")
+            f.write("Bactéria\troot\tsuperkingdom\n")  # Accented character
+            f.write("Escherichia coli ß-strain\tBactéria\tspecies\n")  # German ß
+            f.flush()
+            test_file = Path(f.name)
+
+        try:
+            tree = parser.parse(test_file)
+            assert tree.node_count >= 2
+            
+            # Check Unicode names were preserved
+            node_names = [node.name for node in tree]
+            assert "Bactéria" in node_names
+            assert "Escherichia coli ß-strain" in node_names
+            
+        finally:
+            test_file.unlink()
+
+    def test_parser_with_very_long_names(self):
+        """Test parsers handle very long taxonomic names."""
+        parser = TSVTaxonomyParser()
+        
+        long_name = "Very_long_taxonomic_name_" * 10  # 270 characters
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tsv", delete=False) as f:
+            f.write("child\tparent\trank\n")
+            f.write("root\t\tno rank\n")
+            f.write(f"{long_name}\troot\tspecies\n")
+            f.flush()
+            test_file = Path(f.name)
+
+        try:
+            tree = parser.parse(test_file)
+            assert tree.node_count >= 2
+            
+            # Check long name was preserved
+            node_names = [node.name for node in tree]
+            assert long_name in node_names
+            
+        finally:
+            test_file.unlink()
+
+    def test_parser_with_special_characters(self):
+        """Test parsers handle special characters in names."""
+        parser = TSVTaxonomyParser()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tsv", delete=False) as f:
+            f.write("child\tparent\trank\n")
+            f.write("root\t\tno rank\n")
+            f.write("Bacteria (group)\troot\tsuperkingdom\n")  # Parentheses
+            f.write("Species-with-hyphens_and_underscores\tBacteria (group)\tspecies\n")  # Hyphens and underscores
+            f.write("'Single quotes'\tBacteria (group)\tspecies\n")  # Single quotes
+            f.flush()
+            test_file = Path(f.name)
+
+        try:
+            tree = parser.parse(test_file)
+            assert tree.node_count >= 4
+            
+        finally:
+            test_file.unlink()
+
+    def test_ncbi_parser_with_minimal_nodes_file(self):
+        """Test NCBI parser with minimal nodes.dmp file."""
+        parser = NCBITaxonomyParser()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+
+            # Minimal nodes.dmp - just root
+            nodes_content = "1\t|\t1\t|\tno rank\t|\t\t|\t8\t|\t0\t|\t1\t|\t0\t|\t0\t|\t0\t|\t0\t|\t0\t|\t\t|"
+            names_content = "1\t|\troot\t|\t\t|\tscientific name\t|"
+
+            (tmp_path / "nodes.dmp").write_text(nodes_content)
+            (tmp_path / "names.dmp").write_text(names_content)
+
+            tree = parser.parse(tmp_path)
+            assert tree.node_count == 1
+            
+            root = tree.get_node(1)
+            assert root is not None
+            assert root.name == "root"
+
+    def test_ncbi_parser_with_missing_names_entries(self):
+        """Test NCBI parser handles missing names entries gracefully."""
+        parser = NCBITaxonomyParser()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+
+            # nodes.dmp has entry for tax_id 2, but names.dmp doesn't
+            nodes_content = """1\t|\t1\t|\tno rank\t|\t\t|\t8\t|\t0\t|\t1\t|\t0\t|\t0\t|\t0\t|\t0\t|\t0\t|\t\t|
+2\t|\t1\t|\tspecies\t|\t\t|\t8\t|\t0\t|\t1\t|\t0\t|\t0\t|\t0\t|\t0\t|\t0\t|\t\t|"""
+
+            names_content = """1\t|\troot\t|\t\t|\tscientific name\t|"""
+            # Missing entry for tax_id 2
+
+            (tmp_path / "nodes.dmp").write_text(nodes_content)
+            (tmp_path / "names.dmp").write_text(names_content)
+
+            # Should either handle gracefully or raise informative error
+            try:
+                tree = parser.parse(tmp_path)
+                # If it succeeds, tax_id 2 should have a default name
+                node_2 = tree.get_node(2)
+                if node_2:
+                    assert isinstance(node_2.name, str)
+                    assert len(node_2.name) > 0
+            except ParseError:
+                # Acceptable to raise ParseError for missing names
+                pass

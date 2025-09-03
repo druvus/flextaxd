@@ -335,13 +335,13 @@ Examples:
         """Determine the export type from command arguments."""
         # Handle backward compatibility with --legacy-format
         if hasattr(args, "legacy_format") and args.legacy_format:
-            return args.legacy_format
+            return str(args.legacy_format)
 
         # Use new --classifier or --format options
         if hasattr(args, "classifier") and args.classifier:
-            return args.classifier
+            return str(args.classifier)
         elif hasattr(args, "format") and args.format:
-            return args.format
+            return str(args.format)
         else:
             raise ValidationError("Must specify either --classifier or --format option")
 

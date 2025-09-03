@@ -587,7 +587,7 @@ Examples:
 
             # Create the plot
             ax = plt.gca()  # Get current axes
-            Phylo.draw(
+            Phylo.draw(  # type: ignore[attr-defined]
                 phylo_tree,  # type: ignore
                 label_func=label_func,
                 do_show=False,
