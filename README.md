@@ -2,192 +2,216 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![Type Safety](https://img.shields.io/badge/mypy-100%25%20compliant-brightgreen.svg)](https://mypy.readthedocs.io/)
-[![Code Quality](https://img.shields.io/badge/code%20quality-production%20ready-green.svg)](CLAUDE.md)
 
-**FlexTaxD** is a robust, production-ready bioinformatics tool for creating, customizing, and managing taxonomy databases from diverse sources. Built with **enterprise-grade code quality**, it provides **100% type safety** and comprehensive format support for modern bioinformatics workflows.
+**FlexTaxD** is a bioinformatics tool for creating, customizing, and managing taxonomy databases from diverse sources. It provides a modern CLI interface with clear separation between classifier tools and file formats, supporting major taxonomic classification workflows.
 
-## 🎯 **Why FlexTaxD?**
+## Features
 
-### ✅ **Production Ready & Type Safe**
-- **100% MyPy compliance**: Zero type errors across entire codebase (57 source files)
-- **Comprehensive testing**: Well-tested core functionality
-- **Enterprise architecture**: Modular, maintainable, and extensible
-- **Robust error handling**: Graceful failure modes and clear error messages
-
-### 📚 **Comprehensive Format Support**
+### Format Support
 **Input Formats:**
-- **NCBI**: Standard taxonomy dump format
-- **GTDB**: Genome Taxonomy Database (ar122/bac120)
-- **QIIME**: Semicolon-delimited hierarchies (SILVA-style)
-- **TSV**: Universal tab-separated format
-- **CanSNPer**: Phylogenetic SNP typing
-- **SILVA**: Ribosomal RNA database format
+- **NCBI**: Taxonomy dump format (names.dmp, nodes.dmp)
+- **GTDB**: Genome Taxonomy Database files (ar122/bac120)
+- **QIIME**: Semicolon-delimited hierarchies
+- **TSV**: Tab-separated values (generic format)
+- **CanSNPer**: Phylogenetic SNP classification format
+- **SILVA**: rRNA database formats
 
-**Export Formats (19+ supported):**
-- **Kraken2/Bracken**: Most popular metagenomic classifier
-- **Diamond**: High-performance protein alignment
-- **Ganon/Ganon2**: Hierarchical classification
-- **Sourmash**: k-mer profiling and taxonomy
-- **Sylph**: Ultra-fast genome sketching
-- **Kaiju**: NCBI-compliant protein classification
-- **MALT**: MEGAN alignment tool format
-- **Melon**: Long-read taxonomic profiling
-- **Centrifuge**: Compressed suffix array classifier
-- **NCBI**: Standard names.dmp/nodes.dmp format
-- **CreateTaxDB formats**: accession2taxid, nucl2taxid, prot2taxid
+**Export Options:**
+- **Classifier tools** (--classifier): Creates database structures for classification software
+- **File formats** (--format): Exports single files in specific formats
 
-### 🔧 **Built for Modern Workflows**
-- **CLI-first design**: Simple, intuitive command-line interface
-- **Pipeline integration**: Works seamlessly with nf-core and other workflows
-- **Database management**: Add, modify, and update taxonomic nodes
-- **Visualization**: Tree plots, ASCII output, and Newick export
-- **Type-safe operations**: Full IDE support and autocompletion
+### CLI Design
+The export command uses an intuitive structure:
+- `--classifier`: For tools that need database structures (Kraken2, Diamond, etc.)
+- `--format`: For single file exports (TSV, JSON, accession2taxid, etc.)
 
-## 🚀 **Quick Start**
+### Core Functionality
+- **Database creation**: From multiple input formats with auto-detection
+- **Database modification**: Add, update, and remove taxonomic nodes
+- **Statistics and analysis**: Database metrics and information
+- **Visualization**: Tree plots and Newick format export (requires BioPython)
+- **Pipeline integration**: Compatible with nf-core and other workflows
+
+## Quick Start
 
 ### Installation
 ```bash
-# Install from PyPI (recommended)
-pip install flextaxd
+# Development installation (recommended)
+pip install -e ".[dev]"
 
-# Development installation
-git clone <repository-url>
-cd flextaxd  
-pip install -e ".[dev,visualization]"
+# Production installation  
+pip install .
 
-# Verify installation
-flextaxd --help
+# Install with visualization support
+pip install ".[visualization]"  # Requires BioPython and matplotlib
 ```
 
 ### Basic Usage
+
+#### Database Creation
 ```bash
 # Create database from NCBI taxonomy
 flextaxd create --input taxdump/ --format ncbi --database ncbi.ftd
 
-# Create from GTDB format
+# Create from GTDB format  
 flextaxd create --input gtdb_taxonomy.tsv --format gtdb --database gtdb.ftd
 
 # Create from custom TSV
 flextaxd create --input custom.tsv --format tsv --database custom.ftd
+```
 
-# Export for Kraken2
-flextaxd export --database gtdb.ftd --format kraken2 --output kraken2_db/
+#### Export Examples
+```bash
+# Export to classifier tools (creates directory structures)
+flextaxd export --database gtdb.ftd --classifier kraken2 --output kraken2_db/
+flextaxd export --database gtdb.ftd --classifier diamond --output diamond_db/
+flextaxd export --database gtdb.ftd --classifier metabuli --output metabuli_db/
 
+# Export to single file formats
+flextaxd export --database gtdb.ftd --format tsv --output taxonomy.tsv
+flextaxd export --database gtdb.ftd --format accession2taxid --output acc2taxid.txt
+flextaxd export --database gtdb.ftd --format json --output taxonomy.json
+```
+
+#### Database Management
+```bash
 # Database statistics
 flextaxd stats --database gtdb.ftd --detailed
 
 # Add custom nodes
 flextaxd modify --database gtdb.ftd --add-node "Custom Species" --parent-id 562 --rank species
 
-# Visualize taxonomy
+# Visualize taxonomy (requires BioPython)
 flextaxd visualize --database gtdb.ftd --type tree --output tree.png
 ```
 
-## 🧬 **Bioinformatics Integration**
+## Bioinformatics Integration
 
-### Ready-to-Use with Popular Tools
+### Classification Tool Workflows
 
 **Kraken2 & Bracken:**
 ```bash
-flextaxd export --database db.ftd --format kraken2 --output kraken2_db/
+# Export FlexTaxD database for Kraken2
+flextaxd export --database db.ftd --classifier kraken2 --output kraken2_db/
+
+# Build and run Kraken2 (requires genome sequences)
+kraken2-build --add-to-library sequences.fasta --db kraken2_db/
+kraken2-build --build --db kraken2_db/
 kraken2 --db kraken2_db/ --threads 8 reads.fastq > results.kraken
-bracken -d kraken2_db/ -i results.kraken -o results.bracken
 ```
 
 **Diamond:**
 ```bash
-flextaxd export --database db.ftd --format diamond --output diamond_db/
-diamond makedb --in diamond_db/proteins.fasta -d diamond_db
-diamond blastx -d diamond_db -q reads.fastq -o results.tsv
+# Export for Diamond
+flextaxd export --database db.ftd --classifier diamond --output diamond_db/
+
+# Use with Diamond (requires protein sequences)
+diamond makedb --in proteins.fasta --db diamond_db/proteins
+diamond blastx --db diamond_db/proteins --query reads.fastq --out results.tsv
 ```
 
-**Sourmash:**
+**Modern Tools:**
 ```bash
-flextaxd export --database db.ftd --format sourmash --output taxonomy.csv
-sourmash tax prepare -t taxonomy.csv -o sourmash_db/
-sourmash gather signatures.sig sourmash_db/*.sig
+# Metabuli (modern NCBI-style format)
+flextaxd export --database db.ftd --classifier metabuli --output metabuli_db/
+
+# MetaCache (multiple format support)  
+flextaxd export --database db.ftd --classifier metacache --output metacache_db/
+
+# MMseqs2 (enhanced NCBI format)
+flextaxd export --database db.ftd --classifier mmseqs2 --output mmseqs2_db/
 ```
 
-**Ganon2 (Next-generation):**
+**k-mer Based Tools:**
 ```bash
-flextaxd export --database db.ftd --format ganon2 --output ganon2_db/
-ganon build-custom --input-file ganon2_db/input_files.txt --db-prefix custom_db
-ganon classify --db-prefix custom_db --single reads.fastq
+# Sourmash
+flextaxd export --database db.ftd --classifier sourmash --output sourmash_db/
+
+# Sylph
+flextaxd export --database db.ftd --classifier sylph --output sylph_db/
 ```
 
-**Sylph (Ultra-fast):**
-```bash
-flextaxd export --database db.ftd --format sylph --output sylph_db/
-sylph sketch -l sylph_db/genome_list.txt -o database -c 200
-sylph profile -d database.syldb reads.fastq
-```
+### Pipeline Integration
 
-### Pipeline Compatibility
-
-**nf-core/createtaxdb Integration:**
+**nf-core/createtaxdb Compatible Files:**
 ```bash
-# Export required files
+# Export single file formats for nf-core pipeline
 flextaxd export --database db.ftd --format accession2taxid --output accession2taxid.txt
 flextaxd export --database db.ftd --format nucl2taxid --output nucl2taxid.txt
+flextaxd export --database db.ftd --format prot2taxid --output prot2taxid.txt
 flextaxd export --database db.ftd --format genome_sizes --output genome_sizes.txt
 
-# Use with nf-core pipeline
+# Use with nf-core/createtaxdb pipeline
 nextflow run nf-core/createtaxdb \
     --accession2taxid accession2taxid.txt \
     --nucl2taxid nucl2taxid.txt \
     --genome_sizes genome_sizes.txt
 ```
 
-## 📊 **Architecture & Quality**
+**Generic File Exports:**
+```bash
+# Data exchange formats
+flextaxd export --database db.ftd --format tsv --output taxonomy.tsv
+flextaxd export --database db.ftd --format json --output taxonomy.json
+flextaxd export --database db.ftd --format newick --output tree.nwk
+```
 
-### Enterprise-Grade Code Quality
-- **✅ 100% MyPy Type Compliance**: No type errors across entire codebase
-- **✅ Comprehensive Testing**: Core functionality thoroughly tested
-- **✅ Modular Design**: Plugin-based parsers and exporters
-- **✅ Error Handling**: Robust exception handling and user feedback
-- **✅ Documentation**: Complete CLI help and code documentation
+## Architecture
 
-### Verified Components
+### Code Organization
 ```
 flextaxd/
-├── cli/                    # Complete command-line interface
-├── core/                   # Type-safe foundation
+├── cli/                    # Command-line interface
+│   ├── commands/          # Individual CLI commands 
+│   └── main.py           # Main entry point
+├── core/                   # Core data structures
 │   ├── models.py          # TaxonomyTree, TaxonomyNode classes
-│   ├── adaptive_cache.py  # Advanced caching (type-safe)
-│   └── exceptions.py      # Robust error handling
-├── parsers/               # Format support (6+ parsers)
-├── database/              # SQLite storage layer
-├── exporters/             # Output formats (19+ exporters)
-└── utils/                 # Support infrastructure
+│   ├── exceptions.py      # Error handling
+│   └── [advanced modules] # Performance features (limited testing)
+├── parsers/               # Input format parsers (6 formats)
+├── database/              # SQLite storage operations  
+├── exporters/             # Output format exporters (22+ formats)
+└── utils/                 # Support utilities
 ```
 
 ### Database Features
+- **SQLite storage**: Reliable database backend with ACID compliance
 - **Flexible schema**: Support for diverse taxonomic hierarchies
-- **ACID compliance**: SQLite-based reliable storage
-- **Modification support**: Add, update, remove nodes safely
-- **Statistics**: Comprehensive database analysis
-- **Visualization**: Multiple output formats for tree display
+- **Node operations**: Add, update, and remove taxonomic nodes
+- **Statistics**: Database metrics and analysis
+- **Export options**: Multiple output formats for different tools
 
-## 🔬 **Use Cases**
+### Quality Metrics
+- **Test coverage**: Core functionality tested, some advanced features need validation
+- **Type annotations**: Present throughout codebase with some remaining MyPy issues
+- **Modular design**: Plugin-based architecture for parsers and exporters
+- **CLI design**: Intuitive --classifier/--format distinction for exports
+- **Documentation**: Comprehensive CLI help and usage examples
+
+## Use Cases
 
 ### Research Applications
-- **Custom Taxonomies**: Build specialized databases for research domains
-- **Pipeline Integration**: Seamless workflow incorporation
-- **Multi-format Support**: Convert between taxonomy formats
-- **Database Curation**: Maintain and update taxonomic classifications
+- **Custom taxonomies**: Build specialized databases for specific research domains
+- **Format conversion**: Convert between different taxonomy formats
+- **Database curation**: Maintain and update taxonomic classifications
+- **Pipeline integration**: Incorporate into bioinformatics workflows
 
-### Production Environments
-- **Type Safety**: Zero runtime type errors with MyPy compliance
-- **Scalability**: Handle large taxonomic databases efficiently
-- **Reliability**: Robust error handling and data validation
-- **Maintainability**: Clean, documented, modular codebase
+### Supported Workflows
+- **Metagenomics**: Export databases for Kraken2, Ganon, Centrifuge
+- **Protein analysis**: Create databases for Diamond, Kaiju, MALT
+- **k-mer profiling**: Generate databases for Sourmash, Sylph
+- **Modern tools**: Support for Metabuli, MetaCache, MMseqs2
 
-## 🛠 **Development**
+## Development
 
-### Code Quality Standards
+### Testing
 ```bash
-# Type checking (should show no errors)
+# Run core tests (recommended)
+pytest tests/unit/test_parsers.py -v          # Parser functionality
+pytest tests/unit/test_exporters.py -v        # Export functionality
+pytest tests/unit/test_cli_architecture.py -v # CLI tests
+
+# Type checking (has some remaining issues)
 mypy flextaxd/ --ignore-missing-imports
 
 # Code formatting
@@ -195,54 +219,33 @@ black flextaxd/ tests/
 
 # Linting
 ruff check flextaxd/ tests/
-
-# Run tests
-pytest tests/ -v
-
-# Test coverage
-pytest --cov=flextaxd tests/
 ```
 
-### Contributing
-FlexTaxD follows modern Python development practices:
-- **Type hints**: Full type annotation coverage
-- **Testing**: Comprehensive test suite
-- **Documentation**: Clear code documentation
-- **Code quality**: Automated formatting and linting
+### Contributing Guidelines
+- **Testing**: Add tests for new functionality
+- **Documentation**: Update CLI help and examples
+- **Type safety**: Maintain type annotations where possible
+- **Code quality**: Follow existing formatting standards
 
-## 📖 **Documentation**
+## Documentation
 
 ### Command Reference
 ```bash
-# Get help for any command
-flextaxd --help
-flextaxd create --help
-flextaxd export --help
-flextaxd modify --help
-flextaxd stats --help
-flextaxd visualize --help
+# Comprehensive help system
+flextaxd --help                    # Main help
+flextaxd create --help             # Database creation
+flextaxd export --help             # Export formats
+flextaxd modify --help             # Database modifications
+flextaxd stats --help              # Database statistics  
+flextaxd visualize --help          # Tree visualization
 ```
 
-### Format Support
-- **See CLAUDE.md** for comprehensive format documentation
-- **Verified examples** for all supported input/output formats
-- **Integration guides** for popular bioinformatics tools
+### Additional Resources
+- **CLAUDE.md**: Detailed format documentation and examples
+- **Wiki pages**: Comprehensive guides for input/output formats
+- **CLI help**: Built-in documentation for all commands and options
 
-## 🤝 **Community & Support**
-
-### Getting Help
-- **CLI Help**: Built-in help for all commands (`flextaxd --help`)
-- **Code Documentation**: Type hints and docstrings throughout
-- **Examples**: Working examples in CLAUDE.md
-- **Issues**: Report problems via GitHub issues
-
-### Contributing
-- **Code Quality**: 100% MyPy compliance required
-- **Testing**: Tests for new functionality
-- **Documentation**: Clear documentation for changes
-- **Type Safety**: Maintain type annotation coverage
-
-## 📄 **Citation**
+## Citation
 
 If you use FlexTaxD in your research, please cite:
 
@@ -256,12 +259,10 @@ If you use FlexTaxD in your research, please cite:
 }
 ```
 
-## 📜 **License**
+## License
 
 FlexTaxD is open source software licensed under the [MIT License](LICENSE).
 
 ---
 
-**FlexTaxD** - *Reliable, Type-Safe Taxonomy Database Management*
-
-✅ **Production Ready** | 🛡️ **100% Type Safe** | 🔧 **19+ Export Formats** | 📚 **Comprehensive Documentation**
+**FlexTaxD** - Modern taxonomy database management with intuitive CLI design and comprehensive format support for bioinformatics workflows.
