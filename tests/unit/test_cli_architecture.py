@@ -162,7 +162,7 @@ class TestCLIErrorHandling:
         nonexistent_db = "nonexistent.ftd"
 
         # Export command
-        result_export = main(['export', '--database', nonexistent_db, '--format', 'ncbi', '--output', '/tmp/test'])
+        result_export = main(['export', '--database', nonexistent_db, '--classifier', 'ncbi', '--output', '/tmp/test'])
         assert result_export == 1, "Export should return 1 for nonexistent database"
 
         # Stats command
@@ -225,26 +225,31 @@ class TestCLIExporterRegistration:
             result = main(['create', '--input', temp_input, '--database', temp_db.name, '--overwrite'])
             assert result == 0, "Database creation should succeed"
 
-            # Test major export formats
-            export_formats_to_test = [
+            # Test classifier formats (directory-based)
+            classifier_formats_to_test = [
                 'ncbi', 'kraken2', 'ganon', 'ganon2', 'centrifuge', 'sylph',
-                'diamond', 'melon', 'malt', 'kaiju', 'sourmash',
+                'diamond', 'melon', 'malt', 'kaiju', 'sourmash', 'metabuli', 'metacache', 'mmseqs2'
+            ]
+            
+            # Test single file formats
+            file_formats_to_test = [
                 'tsv', 'json', 'newick',
-                'accession2taxid', 'nucl2taxid', 'prot2taxid', 'genome_sizes', 'malt_mapdb'
+                'accession2taxid', 'nucl2taxid', 'prot2taxid', 'genome_sizes', 'malt_mapdb', 'kmcp'
             ]
 
             temp_export_dir = tempfile.mkdtemp()
 
-            for fmt in export_formats_to_test:
-                if fmt in ['tsv', 'json', 'newick', 'accession2taxid', 'nucl2taxid', 'prot2taxid', 'genome_sizes', 'malt_mapdb']:
-                    # File output formats
-                    output_path = os.path.join(temp_export_dir, f"test_{fmt}")
-                else:
-                    # Directory output formats
-                    output_path = os.path.join(temp_export_dir, fmt)
-
+            # Test classifier formats
+            for fmt in classifier_formats_to_test:
+                output_path = os.path.join(temp_export_dir, fmt)
+                result = main(['export', '--database', temp_db.name, '--classifier', fmt, '--output', output_path])
+                assert result == 0, f"Classifier format {fmt} should be registered and working"
+                
+            # Test file formats  
+            for fmt in file_formats_to_test:
+                output_path = os.path.join(temp_export_dir, f"test_{fmt}")
                 result = main(['export', '--database', temp_db.name, '--format', fmt, '--output', output_path])
-                assert result == 0, f"Export format {fmt} should be registered and working"
+                assert result == 0, f"File format {fmt} should be registered and working"
 
         finally:
             os.unlink(temp_input)
@@ -286,6 +291,128 @@ class TestCLIHelpText:
             with pytest.raises(SystemExit) as exc_info:
                 main([cmd, '--help'])
             assert exc_info.value.code == 0, f"Command {cmd} should have working help"
+
+
+class TestCLINewStructure:
+    """Test new CLI structure with --classifier and --format split."""
+    
+    def test_mutually_exclusive_classifier_format(self):
+        """Test that --classifier and --format are mutually exclusive."""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.tsv', delete=False) as f:
+            f.write("parent\tchild\nroot\tBacteria")
+            temp_input = f.name
+
+        temp_db = tempfile.NamedTemporaryFile(suffix='.ftd', delete=False)
+        temp_db.close()
+        
+        try:
+            # Create database first
+            result = main(['create', '--input', temp_input, '--database', temp_db.name, '--overwrite'])
+            assert result == 0, "Database creation should succeed"
+            
+            # Try to use both --classifier and --format (should fail)
+            with pytest.raises(SystemExit) as exc_info:
+                main(['export', '--database', temp_db.name, '--classifier', 'kraken2', '--format', 'tsv', '--output', '/tmp/test'])
+            assert exc_info.value.code == 2, "Should exit with code 2 for mutually exclusive arguments"
+            
+        finally:
+            os.unlink(temp_input)
+            if os.path.exists(temp_db.name):
+                os.unlink(temp_db.name)
+    
+    def test_require_one_of_classifier_format(self):
+        """Test that either --classifier or --format must be specified."""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.tsv', delete=False) as f:
+            f.write("parent\tchild\nroot\tBacteria")
+            temp_input = f.name
+
+        temp_db = tempfile.NamedTemporaryFile(suffix='.ftd', delete=False)
+        temp_db.close()
+        
+        try:
+            # Create database first
+            result = main(['create', '--input', temp_input, '--database', temp_db.name, '--overwrite'])
+            assert result == 0, "Database creation should succeed"
+            
+            # Try to export without --classifier or --format (should fail)  
+            with pytest.raises(SystemExit) as exc_info:
+                main(['export', '--database', temp_db.name, '--output', '/tmp/test'])
+            assert exc_info.value.code == 2, "Should exit with code 2 for missing required argument"
+            
+        finally:
+            os.unlink(temp_input)
+            if os.path.exists(temp_db.name):
+                os.unlink(temp_db.name)
+    
+    def test_classifier_creates_directory(self):
+        """Test that classifier formats create directories with multiple files."""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.tsv', delete=False) as f:
+            f.write("parent\tchild\nroot\tBacteria\nBacteria\tE_coli")
+            temp_input = f.name
+
+        temp_db = tempfile.NamedTemporaryFile(suffix='.ftd', delete=False)
+        temp_db.close()
+        
+        temp_output_dir = tempfile.mkdtemp()
+        
+        try:
+            # Create database first
+            result = main(['create', '--input', temp_input, '--database', temp_db.name, '--overwrite'])
+            assert result == 0, "Database creation should succeed"
+            
+            # Export with classifier format
+            result = main(['export', '--database', temp_db.name, '--classifier', 'ncbi', '--output', temp_output_dir])
+            assert result == 0, "Classifier export should succeed"
+            
+            # Check that directory was created with expected files
+            assert os.path.isdir(temp_output_dir), "Output should be a directory"
+            files = os.listdir(temp_output_dir)
+            assert len(files) > 0, "Directory should contain files"
+            # NCBI format should create names.dmp and nodes.dmp
+            assert any('names.dmp' in f for f in files), "Should create names.dmp file"
+            assert any('nodes.dmp' in f for f in files), "Should create nodes.dmp file"
+            
+        finally:
+            os.unlink(temp_input)
+            if os.path.exists(temp_db.name):
+                os.unlink(temp_db.name)
+            import shutil
+            if os.path.exists(temp_output_dir):
+                shutil.rmtree(temp_output_dir)
+    
+    def test_format_creates_single_file(self):
+        """Test that file formats create single files."""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.tsv', delete=False) as f:
+            f.write("parent\tchild\nroot\tBacteria\nBacteria\tE_coli")
+            temp_input = f.name
+
+        temp_db = tempfile.NamedTemporaryFile(suffix='.ftd', delete=False)
+        temp_db.close()
+        
+        temp_output_file = os.path.join(tempfile.mkdtemp(), 'output.tsv')
+        
+        try:
+            # Create database first
+            result = main(['create', '--input', temp_input, '--database', temp_db.name, '--overwrite'])
+            assert result == 0, "Database creation should succeed"
+            
+            # Export with file format
+            result = main(['export', '--database', temp_db.name, '--format', 'tsv', '--output', temp_output_file])
+            assert result == 0, "File format export should succeed"
+            
+            # Check that single file was created
+            assert os.path.isfile(temp_output_file), "Output should be a single file"
+            assert os.path.getsize(temp_output_file) > 0, "File should not be empty"
+            
+        finally:
+            os.unlink(temp_input)
+            if os.path.exists(temp_db.name):
+                os.unlink(temp_db.name)
+            if os.path.exists(temp_output_file):
+                os.unlink(temp_output_file)
+                parent_dir = os.path.dirname(temp_output_file)
+                if os.path.exists(parent_dir):
+                    os.rmdir(parent_dir)
 
 
 class TestCLIIntegration:

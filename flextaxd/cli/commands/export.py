@@ -20,34 +20,35 @@ class ExportCommand(BaseCommand):
         parser = subparsers.add_parser(
             'export',
             help='Export taxonomy database to various formats',
-            description='Export a taxonomy database to classifier formats, createtaxdb formats, or other formats',
+            description='Export a taxonomy database to classifier tools (--classifier creates directory with multiple files) or single file formats (--format creates one file)',
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
-  # Standard classifier formats
-  flextaxd export --database my_db.ftd --format ncbi --output ./ncbi_dump/
-  flextaxd export --database my_db.ftd --format kraken2 --output ./kraken2_db/
-  flextaxd export --database my_db.ftd --format ganon --output ./ganon_db/
-  flextaxd export --database my_db.ftd --format centrifuge --output ./centrifuge_db/
+  # Classifier database formats (create multiple files in directory)
+  flextaxd export --database my_db.ftd --classifier ncbi --output ./ncbi_dump/
+  flextaxd export --database my_db.ftd --classifier kraken2 --output ./kraken2_db/
+  flextaxd export --database my_db.ftd --classifier ganon --output ./ganon_db/
+  flextaxd export --database my_db.ftd --classifier centrifuge --output ./centrifuge_db/
   
-  # New classifier formats
-  flextaxd export --database my_db.ftd --format metabuli --output ./metabuli_db/
-  flextaxd export --database my_db.ftd --format metabuli --include-merged --output ./metabuli_db/
-  flextaxd export --database my_db.ftd --format metacache --output ./metacache_db/
-  flextaxd export --database my_db.ftd --format metacache --format-type assembly_summary --output ./metacache_db/
-  flextaxd export --database my_db.ftd --format mmseqs2 --output ./mmseqs2_db/
-  flextaxd export --database my_db.ftd --format mmseqs2 --sequence-type protein --output ./mmseqs2_db/
+  # Modern classifier formats
+  flextaxd export --database my_db.ftd --classifier metabuli --output ./metabuli_db/
+  flextaxd export --database my_db.ftd --classifier metabuli --include-merged --output ./metabuli_db/
+  flextaxd export --database my_db.ftd --classifier metacache --output ./metacache_db/
+  flextaxd export --database my_db.ftd --classifier metacache --format-type assembly_summary --output ./metacache_db/
+  flextaxd export --database my_db.ftd --classifier mmseqs2 --output ./mmseqs2_db/
+  flextaxd export --database my_db.ftd --classifier mmseqs2 --sequence-type protein --output ./mmseqs2_db/
   
-  # CreateTaxDB compatible formats (for nf-core/createtaxdb pipeline)
+  # Single file formats
+  flextaxd export --database my_db.ftd --format tsv --output taxonomy.tsv
+  flextaxd export --database my_db.ftd --format newick --output tree.nwk  
+  flextaxd export --database my_db.ftd --format json --output taxonomy.json
+  
+  # CreateTaxDB compatible single file formats (for nf-core/createtaxdb pipeline)
   flextaxd export --database my_db.ftd --format accession2taxid --output accession2taxid.txt
   flextaxd export --database my_db.ftd --format nucl2taxid --output nucl2taxid.txt
   flextaxd export --database my_db.ftd --format prot2taxid --output prot2taxid.txt
   flextaxd export --database my_db.ftd --format genome_sizes --output genome_sizes.txt
   flextaxd export --database my_db.ftd --format malt_mapdb --output taxonomy.db
-  
-  # Other formats
-  flextaxd export --database my_db.ftd --format tsv --output taxonomy.tsv
-  flextaxd export --database my_db.ftd --format newick --output tree.nwk
             """
         )
         
@@ -58,20 +59,39 @@ Examples:
             help='Database file path (.ftd)'
         )
         
-        parser.add_argument(
+        # Create mutually exclusive group for classifier vs format
+        export_group = parser.add_mutually_exclusive_group(required=True)
+        
+        export_group.add_argument(
+            '--classifier', '-c',
+            type=str,
+            choices=[
+                'ncbi', 'kraken2', 'ganon', 'ganon2', 'centrifuge', 'sylph', 'diamond', 'melon', 'malt', 'kaiju', 'sourmash',
+                'metabuli', 'metacache', 'mmseqs2'
+            ],
+            help='Export for specific classifier tool (creates database structure with multiple files)'
+        )
+        
+        export_group.add_argument(
             '--format', '-f',
             type=str,
             choices=[
-                # Standard classifier formats
-                'ncbi', 'kraken2', 'ganon', 'ganon2', 'centrifuge', 'sylph', 'diamond', 'melon', 'malt', 'kaiju', 'sourmash',
-                'metabuli', 'metacache', 'mmseqs2',
-                # Standard export formats
                 'tsv', 'newick', 'json',
-                # CreateTaxDB compatible formats
                 'accession2taxid', 'nucl2taxid', 'prot2taxid', 'genome_sizes', 'malt_mapdb', 'kmcp'
             ],
-            default='ncbi',
-            help='Export format (default: ncbi)'
+            help='Export as single file format'
+        )
+        
+        # Keep old --format for backward compatibility (deprecated)
+        parser.add_argument(
+            '--legacy-format',
+            type=str,
+            choices=[
+                'ncbi', 'kraken2', 'ganon', 'ganon2', 'centrifuge', 'sylph', 'diamond', 'melon', 'malt', 'kaiju', 'sourmash',
+                'metabuli', 'metacache', 'mmseqs2', 'tsv', 'newick', 'json',
+                'accession2taxid', 'nucl2taxid', 'prot2taxid', 'genome_sizes', 'malt_mapdb', 'kmcp'
+            ],
+            help=argparse.SUPPRESS  # Hidden option for backward compatibility
         )
         
         parser.add_argument(
@@ -192,11 +212,20 @@ Examples:
             # Setup output path
             output_path = Path(args.output)
             
-            if args.format in ['ncbi', 'kraken2', 'ganon', 'centrifuge', 'metabuli', 'metacache', 'mmseqs2']:
-                # These formats export to directories
+            # Determine the export type from arguments
+            export_type = self._determine_export_type(args)
+            
+            # Classify as directory-based (classifiers) or file-based (single files)
+            classifier_formats = [
+                'ncbi', 'kraken2', 'ganon', 'ganon2', 'centrifuge', 'sylph', 'diamond', 
+                'melon', 'malt', 'kaiju', 'sourmash', 'metabuli', 'metacache', 'mmseqs2'
+            ]
+            
+            if export_type in classifier_formats:
+                # Directory-based exports (classifiers)
                 self._validate_output_directory(str(output_path), create=True)
             else:
-                # Other formats export to files
+                # File-based exports (single files)
                 if output_path.exists() and output_path.is_dir():
                     raise ValidationError(f"Output path is a directory, expected file: {args.output}")
                 # Ensure parent directory exists
@@ -208,14 +237,17 @@ Examples:
                 
                 self.logger.info(f"Loaded tree with {tree.node_count} nodes")
                 
-                if args.format in ['ncbi', 'kraken2', 'ganon', 'centrifuge', 'metabuli', 'metacache', 'mmseqs2', 'accession2taxid', 'nucl2taxid', 'prot2taxid', 'genome_sizes', 'malt_mapdb', 'kmcp']:
-                    self._export_classifier_format(tree, output_path, args)
-                elif args.format == 'tsv':
+                # Route to appropriate export method
+                if export_type in classifier_formats or export_type in ['accession2taxid', 'nucl2taxid', 'prot2taxid', 'genome_sizes', 'malt_mapdb', 'kmcp']:
+                    self._export_classifier_format(tree, output_path, args, export_type)
+                elif export_type == 'tsv':
                     self._export_tsv(tree, output_path, args)
-                elif args.format == 'newick':
+                elif export_type == 'newick':
                     self._export_newick(tree, output_path, args)
-                elif args.format == 'json':
+                elif export_type == 'json':
                     self._export_json(tree, output_path, args)
+                else:
+                    raise ValidationError(f"Unknown export type: {export_type}")
             
             print(f"Export completed: {args.output}")
             return 0
@@ -235,7 +267,21 @@ Examples:
             print(f"Export error: {e.message}")
             return 1
     
-    def _export_classifier_format(self, tree: TaxonomyTree, output_path: Path, args: argparse.Namespace) -> None:
+    def _determine_export_type(self, args: argparse.Namespace) -> str:
+        """Determine the export type from command arguments."""
+        # Handle backward compatibility with --legacy-format
+        if hasattr(args, 'legacy_format') and args.legacy_format:
+            return args.legacy_format
+        
+        # Use new --classifier or --format options
+        if hasattr(args, 'classifier') and args.classifier:
+            return args.classifier
+        elif hasattr(args, 'format') and args.format:
+            return args.format
+        else:
+            raise ValidationError("Must specify either --classifier or --format option")
+    
+    def _export_classifier_format(self, tree: TaxonomyTree, output_path: Path, args: argparse.Namespace, export_type: str) -> None:
         """Export to classifier-specific format using appropriate exporter."""
         from ...exporters.ncbi import NCBIExporter
         from ...exporters.kraken2 import Kraken2Exporter
@@ -285,10 +331,10 @@ Examples:
             'kmcp': KMCPExporter,
         }
         
-        exporter_class = exporters[args.format]
+        exporter_class = exporters[export_type]
         exporter = exporter_class()
         
-        self.logger.info(f"Exporting to {args.format} format: {output_path}")
+        self.logger.info(f"Exporting to {export_type} format: {output_path}")
         
         # Prepare export options
         export_options = {
@@ -310,7 +356,7 @@ Examples:
         # Export using the appropriate exporter
         exporter.export(tree, output_path, **export_options)
         
-        print(f"Created {args.format} taxonomy files in: {output_path}")
+        print(f"Created {export_type} taxonomy files in: {output_path}")
         
         # Show what was created
         created_files = list(output_path.glob("*"))
