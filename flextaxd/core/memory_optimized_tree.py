@@ -63,6 +63,7 @@ class LazyTaxonomyTree:
         self._cache_hits = 0
         self._cache_misses = 0
         self._nodes_loaded = 0
+        self._total_accesses = 0
 
         # Root node cache
         self._root_id: Optional[int] = None
@@ -82,6 +83,7 @@ class LazyTaxonomyTree:
             "cache_size_limit": self.cache_size,
             "cache_hit_rate": self.cache_hit_rate,
             "nodes_loaded": self._nodes_loaded,
+            "total_accesses": self._total_accesses,
             "memory_efficiency": len(self._node_cache) / max(1, self._nodes_loaded),
         }
 
@@ -106,6 +108,8 @@ class LazyTaxonomyTree:
         import time
 
         with self._cache_lock:
+            # Increment total accesses counter
+            self._total_accesses += 1
             # Check cache first
             if tax_id in self._node_cache:
                 entry = self._node_cache[tax_id]
@@ -248,10 +252,17 @@ class LazyTaxonomyTree:
 class StreamingTaxonomyTree:
     """Streaming taxonomy tree for memory-constrained environments."""
 
-    def __init__(self, node_provider: NodeProvider):
+    def __init__(self, node_provider: NodeProvider, chunk_size: int = 100, node_filter=None):
         self.node_provider = node_provider
+        self.chunk_size = chunk_size
+        self.node_filter = node_filter
         self._visited_cache: Set[int] = set()
         self._current_path: List[int] = []
+        self._stats = {
+            "nodes_processed": 0,
+            "chunks_processed": 0,
+            "memory_usage": 0
+        }
 
     def stream_subtree(self, root_tax_id: int) -> Iterator[TaxonomyNode]:
         """Stream nodes in a subtree depth-first."""
@@ -317,6 +328,31 @@ class StreamingTaxonomyTree:
             "max_concurrent_nodes": max_concurrent_nodes,
             "node_size_bytes": node_size,
         }
+
+    def __iter__(self) -> Iterator[TaxonomyNode]:
+        """Iterate over all nodes in the tree."""
+        all_ids = self.node_provider.get_all_node_ids()
+        processed = 0
+        chunk_count = 0
+        
+        for tax_id in all_ids:
+            node = self.node_provider.get_node(tax_id)
+            if node:
+                # Apply filter if provided
+                if self.node_filter is None or self.node_filter(node):
+                    self._stats["nodes_processed"] += 1
+                    processed += 1
+                    
+                    # Count chunks
+                    if processed % self.chunk_size == 0:
+                        chunk_count += 1
+                        self._stats["chunks_processed"] = chunk_count
+                    
+                    yield node
+
+    def get_processing_stats(self) -> Dict[str, int]:
+        """Get processing statistics."""
+        return self._stats.copy()
 
 
 class MemoryEfficientNodeProvider:

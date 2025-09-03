@@ -18,6 +18,7 @@ from flextaxd.parsers import (
 from flextaxd.exporters import Kraken2Exporter, GanonExporter, CentrifugeExporter
 from flextaxd.database.sqlite import SQLiteTaxonomyRepository
 from flextaxd.cli.commands.create import CreateCommand
+from flextaxd.core.models import TaxonomicRank
 from flextaxd.cli.commands.export import ExportCommand
 
 
@@ -364,9 +365,9 @@ AB000002\tBacteria;Proteobacteria;Gammaproteobacteria;Enterobacterales;Enterobac
         with SQLiteTaxonomyRepository(database_file) as repo:
             stats = repo.get_statistics()
             assert stats["node_count"] >= 5  # Should have at least 5 unique nodes
-            assert stats["root_count"] == 1  # Should have one root node
+            assert len(stats["root_nodes"]) == 1  # Should have one root node
             assert (
-                "subspecies" in stats["rank_distribution"]
+                TaxonomicRank.SUBSPECIES in stats["rank_distribution"]
             )  # Should have subspecies ranks
 
     def test_format_conversion_chain(self, tmp_path: Path):
@@ -508,14 +509,14 @@ Salmonella	Salmonella enterica	28901	species"""
 
             # Count nodes by rank (root gets 'custom' rank from TSV parser)
             expected_ranks = {
-                "custom": 1,  # Root node gets custom rank
-                "superkingdom": 2,
-                "phylum": 2,
-                "class": 1,
-                "order": 1,
-                "family": 1,
-                "genus": 2,
-                "species": 2,
+                TaxonomicRank.CUSTOM: 1,  # Root node gets custom rank
+                TaxonomicRank.SUPERKINGDOM: 2,
+                TaxonomicRank.PHYLUM: 2,
+                TaxonomicRank.CLASS: 1,
+                TaxonomicRank.ORDER: 1,
+                TaxonomicRank.FAMILY: 1,
+                TaxonomicRank.GENUS: 2,
+                TaxonomicRank.SPECIES: 2,
             }
 
             total_expected = sum(expected_ranks.values())
@@ -527,4 +528,4 @@ Salmonella	Salmonella enterica	28901	species"""
                     actual_count = stats["rank_distribution"].get(rank, 0)
                     assert (
                         actual_count == expected_count
-                    ), f"Expected {expected_count} {rank} nodes, got {actual_count}"
+                    ), f"Expected {expected_count} {rank.value} nodes, got {actual_count}"

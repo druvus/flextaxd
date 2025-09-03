@@ -37,6 +37,9 @@ class TestNewExportersIntegration:
             args.include_merged = True
             args.names_file = "names.dmp"
             args.nodes_file = "nodes.dmp"
+            # Additional CLI args needed by ExportCommand
+            args.legacy_format = None
+            args.classifier = None
 
             result = cmd.execute(args)
 
@@ -67,7 +70,9 @@ class TestNewExportersIntegration:
             args.format_type = "ncbi_taxonomy"
             args.names_file = "names.dmp"
             args.nodes_file = "nodes.dmp"
-
+            # Additional CLI args needed by ExportCommand
+            args.legacy_format = None
+            args.classifier = None
             result = cmd.execute(args)
 
             assert result == 0
@@ -95,7 +100,9 @@ class TestNewExportersIntegration:
             args.format_type = "assembly_summary"
             args.names_file = "names.dmp"
             args.nodes_file = "nodes.dmp"
-
+            # Additional CLI args needed by ExportCommand
+            args.legacy_format = None
+            args.classifier = None
             result = cmd.execute(args)
 
             assert result == 0
@@ -128,7 +135,9 @@ class TestNewExportersIntegration:
             args.create_lca_mapping = True
             args.names_file = "names.dmp"
             args.nodes_file = "nodes.dmp"
-
+            # Additional CLI args needed by ExportCommand
+            args.legacy_format = None
+            args.classifier = None
             result = cmd.execute(args)
 
             assert result == 0
@@ -160,7 +169,9 @@ class TestNewExportersIntegration:
             args.create_lca_mapping = True
             args.names_file = "names.dmp"
             args.nodes_file = "nodes.dmp"
-
+            # Additional CLI args needed by ExportCommand
+            args.legacy_format = None
+            args.classifier = None
             result = cmd.execute(args)
 
             assert result == 0
@@ -193,6 +204,9 @@ class TestNewExportersIntegration:
                 args.include_genomes = True
                 args.names_file = "names.dmp"
                 args.nodes_file = "nodes.dmp"
+                # Additional CLI args needed by ExportCommand
+                args.legacy_format = None
+                args.classifier = None
                 # Format-specific options
                 args.include_merged = False
                 args.format_type = "ncbi_taxonomy"
@@ -221,7 +235,9 @@ class TestNewExportersIntegration:
             args.include_merged = False
             args.names_file = "names.dmp"
             args.nodes_file = "nodes.dmp"
-
+            # Additional CLI args needed by ExportCommand
+            args.legacy_format = None
+            args.classifier = None
             result = cmd.execute(args)
             assert result == 1  # Should return error code
 
@@ -245,7 +261,9 @@ class TestNewExportersIntegration:
             args.include_merged = False
             args.names_file = "names.dmp"
             args.nodes_file = "nodes.dmp"
-
+            # Additional CLI args needed by ExportCommand
+            args.legacy_format = None
+            args.classifier = None
             with patch(
                 "flextaxd.utils.subprocess_utils.compress_file"
             ) as mock_compress:
@@ -276,7 +294,9 @@ class TestNewExportersIntegration:
             args.create_lca_mapping = True
             args.names_file = "names.dmp"
             args.nodes_file = "nodes.dmp"
-
+            # Additional CLI args needed by ExportCommand
+            args.legacy_format = None
+            args.classifier = None
             import time
 
             start_time = time.time()
@@ -478,6 +498,9 @@ class TestNewExportersPerformance:
             args.include_genomes = True
             args.names_file = "names.dmp"
             args.nodes_file = "nodes.dmp"
+            # Additional CLI args needed by ExportCommand
+            args.legacy_format = None
+            args.classifier = None
             # Format-specific options
             args.include_merged = False
             args.format_type = "ncbi_taxonomy"

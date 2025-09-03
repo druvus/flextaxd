@@ -17,6 +17,7 @@ from flextaxd.exporters import Kraken2Exporter, GanonExporter, CentrifugeExporte
 from flextaxd.database.sqlite import SQLiteTaxonomyRepository
 from flextaxd.cli.commands.create import CreateCommand
 from flextaxd.cli.commands.export import ExportCommand
+from flextaxd.core.models import TaxonomicRank
 
 
 class TestSimplifiedWorkflows:
@@ -99,9 +100,9 @@ Escherichia\tEscherichia coli\t562\tspecies"""
         with SQLiteTaxonomyRepository(database_file) as repo:
             stats = repo.get_statistics()
             assert stats["node_count"] == 4  # 3 explicit + 1 implicit root
-            assert "phylum" in stats["rank_distribution"]
-            assert "genus" in stats["rank_distribution"]
-            assert "species" in stats["rank_distribution"]
+            assert TaxonomicRank.PHYLUM in stats["rank_distribution"]
+            assert TaxonomicRank.GENUS in stats["rank_distribution"]
+            assert TaxonomicRank.SPECIES in stats["rank_distribution"]
 
     def test_qiime_gtdb_parsing(self, tmp_path: Path):
         """Test GTDB/QIIME format parsing."""
@@ -129,9 +130,9 @@ Escherichia\tEscherichia coli\t562\tspecies"""
         with SQLiteTaxonomyRepository(database_file) as repo:
             stats = repo.get_statistics()
             assert stats["node_count"] >= 7  # Should have domain through species
-            assert "superkingdom" in stats["rank_distribution"]
-            assert "phylum" in stats["rank_distribution"]
-            assert "species" in stats["rank_distribution"]
+            assert TaxonomicRank.SUPERKINGDOM in stats["rank_distribution"]
+            assert TaxonomicRank.PHYLUM in stats["rank_distribution"]
+            assert TaxonomicRank.SPECIES in stats["rank_distribution"]
 
     def test_export_to_kraken2(self, tmp_path: Path):
         """Test export to Kraken2 format."""
@@ -273,7 +274,7 @@ AB000002\tBacteria;Firmicutes;Bacilli"""
         with SQLiteTaxonomyRepository(database_file) as repo:
             stats = repo.get_statistics()
             assert stats["node_count"] >= 4  # Should have several taxonomic levels
-            assert "superkingdom" in stats["rank_distribution"]
+            assert TaxonomicRank.SUPERKINGDOM in stats["rank_distribution"]
 
     def test_complete_workflow_chain(self, tmp_path: Path):
         """Test a complete workflow from TSV to multiple export formats."""
@@ -353,15 +354,15 @@ Escherichia\tEscherichia coli\t562\tspecies"""
 
             # Check rank distribution
             expected_ranks = {
-                "superkingdom": 2,  # Bacteria, Archaea
-                "phylum": 2,  # Proteobacteria, Firmicutes
-                "genus": 1,  # Escherichia
-                "species": 1,  # E. coli
-                "custom": 1,  # Implicit root
+                TaxonomicRank.SUPERKINGDOM: 2,  # Bacteria, Archaea
+                TaxonomicRank.PHYLUM: 2,  # Proteobacteria, Firmicutes
+                TaxonomicRank.GENUS: 1,  # Escherichia
+                TaxonomicRank.SPECIES: 1,  # E. coli
+                TaxonomicRank.CUSTOM: 1,  # Implicit root
             }
 
             for rank, expected_count in expected_ranks.items():
                 actual_count = stats["rank_distribution"].get(rank, 0)
                 assert (
                     actual_count == expected_count
-                ), f"Expected {expected_count} {rank} nodes, got {actual_count}"
+                ), f"Expected {expected_count} {rank.value} nodes, got {actual_count}"

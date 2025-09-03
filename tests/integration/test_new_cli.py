@@ -78,7 +78,7 @@ class TestNewCLI:
 
         assert result.returncode == 0
         assert (
-            "Export a taxonomy database to classifier formats, createtaxdb formats, or other formats"
+            "Export a taxonomy database to classifier tools" 
             in result.stdout
         )
         assert "--format" in result.stdout
