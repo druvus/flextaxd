@@ -12,6 +12,9 @@ from .malt import MALTExporter
 from .melon import MelonExporter
 from .sourmash import SourmashExporter
 from .sylph import SylphExporter
+from .metabuli import MetabuliExporter
+from .metacache import MetaCacheExporter
+from .mmseqs2 import MMseqs2Exporter
 
 # CreateTaxDB compatible exporters
 from .accession2taxid import Accession2TaxidExporter
@@ -34,6 +37,9 @@ __all__ = [
     "MelonExporter",
     "SourmashExporter",
     "SylphExporter",
+    "MetabuliExporter",
+    "MetaCacheExporter",
+    "MMseqs2Exporter",
     # CreateTaxDB formats
     "Accession2TaxidExporter",
     "Nucl2TaxidExporter", 

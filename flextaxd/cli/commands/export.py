@@ -30,6 +30,14 @@ Examples:
   flextaxd export --database my_db.ftd --format ganon --output ./ganon_db/
   flextaxd export --database my_db.ftd --format centrifuge --output ./centrifuge_db/
   
+  # New classifier formats
+  flextaxd export --database my_db.ftd --format metabuli --output ./metabuli_db/
+  flextaxd export --database my_db.ftd --format metabuli --include-merged --output ./metabuli_db/
+  flextaxd export --database my_db.ftd --format metacache --output ./metacache_db/
+  flextaxd export --database my_db.ftd --format metacache --format-type assembly_summary --output ./metacache_db/
+  flextaxd export --database my_db.ftd --format mmseqs2 --output ./mmseqs2_db/
+  flextaxd export --database my_db.ftd --format mmseqs2 --sequence-type protein --output ./mmseqs2_db/
+  
   # CreateTaxDB compatible formats (for nf-core/createtaxdb pipeline)
   flextaxd export --database my_db.ftd --format accession2taxid --output accession2taxid.txt
   flextaxd export --database my_db.ftd --format nucl2taxid --output nucl2taxid.txt
@@ -56,6 +64,7 @@ Examples:
             choices=[
                 # Standard classifier formats
                 'ncbi', 'kraken2', 'ganon', 'ganon2', 'centrifuge', 'sylph', 'diamond', 'melon', 'malt', 'kaiju', 'sourmash',
+                'metabuli', 'metacache', 'mmseqs2',
                 # Standard export formats
                 'tsv', 'newick', 'json',
                 # CreateTaxDB compatible formats
@@ -140,6 +149,38 @@ Examples:
             help='Include header row in TSV output'
         )
         
+        # New classifier-specific options
+        metabuli_group = parser.add_argument_group('Metabuli format options')
+        metabuli_group.add_argument(
+            '--include-merged',
+            action='store_true',
+            help='Include merged.dmp file for historical taxonomy changes'
+        )
+        
+        metacache_group = parser.add_argument_group('MetaCache format options')
+        metacache_group.add_argument(
+            '--format-type',
+            type=str,
+            choices=['ncbi_taxonomy', 'assembly_summary', 'accession2taxid'],
+            default='ncbi_taxonomy',
+            help='MetaCache export format type (default: ncbi_taxonomy)'
+        )
+        
+        mmseqs2_group = parser.add_argument_group('MMseqs2 format options')
+        mmseqs2_group.add_argument(
+            '--sequence-type',
+            type=str,
+            choices=['all', 'protein', 'nucleotide'],
+            default='all',
+            help='Filter sequences by type (default: all)'
+        )
+        mmseqs2_group.add_argument(
+            '--create-lca-mapping',
+            action='store_true',
+            default=True,
+            help='Create LCA-compatible taxonomy mappings (default: True)'
+        )
+        
         return parser
     
     def execute(self, args: argparse.Namespace) -> Optional[int]:
@@ -151,7 +192,7 @@ Examples:
             # Setup output path
             output_path = Path(args.output)
             
-            if args.format in ['ncbi', 'kraken2', 'ganon', 'centrifuge']:
+            if args.format in ['ncbi', 'kraken2', 'ganon', 'centrifuge', 'metabuli', 'metacache', 'mmseqs2']:
                 # These formats export to directories
                 self._validate_output_directory(str(output_path), create=True)
             else:
@@ -167,7 +208,7 @@ Examples:
                 
                 self.logger.info(f"Loaded tree with {tree.node_count} nodes")
                 
-                if args.format in ['ncbi', 'kraken2', 'ganon', 'centrifuge', 'accession2taxid', 'nucl2taxid', 'prot2taxid', 'genome_sizes', 'malt_mapdb', 'kmcp']:
+                if args.format in ['ncbi', 'kraken2', 'ganon', 'centrifuge', 'metabuli', 'metacache', 'mmseqs2', 'accession2taxid', 'nucl2taxid', 'prot2taxid', 'genome_sizes', 'malt_mapdb', 'kmcp']:
                     self._export_classifier_format(tree, output_path, args)
                 elif args.format == 'tsv':
                     self._export_tsv(tree, output_path, args)
@@ -207,6 +248,9 @@ Examples:
         from ...exporters.malt import MALTExporter
         from ...exporters.kaiju import KaijuExporter
         from ...exporters.sourmash import SourmashExporter
+        from ...exporters.metabuli import MetabuliExporter
+        from ...exporters.metacache import MetaCacheExporter
+        from ...exporters.mmseqs2 import MMseqs2Exporter
         # CreateTaxDB compatible exporters
         from ...exporters.accession2taxid import Accession2TaxidExporter
         from ...exporters.nucl2taxid import Nucl2TaxidExporter
@@ -229,6 +273,9 @@ Examples:
             'malt': MALTExporter,
             'kaiju': KaijuExporter,
             'sourmash': SourmashExporter,
+            'metabuli': MetabuliExporter,
+            'metacache': MetaCacheExporter,
+            'mmseqs2': MMseqs2Exporter,
             # CreateTaxDB compatible formats
             'accession2taxid': Accession2TaxidExporter,
             'nucl2taxid': Nucl2TaxidExporter,
@@ -253,6 +300,11 @@ Examples:
             'sequence_filter': getattr(args, 'sequence_filter', 'all'),
             'default_genome_size': getattr(args, 'default_genome_size', 1000000),
             'db_version': getattr(args, 'db_version', '1.0'),
+            # New classifier options
+            'include_merged': getattr(args, 'include_merged', False),
+            'format_type': getattr(args, 'format_type', 'ncbi_taxonomy'),
+            'sequence_type': getattr(args, 'sequence_type', 'all'),
+            'create_lca_mapping': getattr(args, 'create_lca_mapping', True),
         }
         
         # Export using the appropriate exporter

@@ -12,7 +12,8 @@ from flextaxd.core.exceptions import ExportError
 from flextaxd.exporters import (
     NCBIExporter, Kraken2Exporter, GanonExporter, CentrifugeExporter,
     Accession2TaxidExporter, Nucl2TaxidExporter, Prot2TaxidExporter,
-    GenomeSizesExporter, MALTMapDBExporter
+    GenomeSizesExporter, MALTMapDBExporter, MetabuliExporter, 
+    MetaCacheExporter, MMseqs2Exporter
 )
 from flextaxd.exporters.base import TaxonomyExporter, FileBasedExporter, DirectoryBasedExporter
 
@@ -651,7 +652,10 @@ class TestExporterErrorHandling:
             Nucl2TaxidExporter(),
             Prot2TaxidExporter(),
             GenomeSizesExporter(),
-            MALTMapDBExporter()
+            MALTMapDBExporter(),
+            MetabuliExporter(),
+            MetaCacheExporter(),
+            MMseqs2Exporter()
         ]
         
         empty_tree = TaxonomyTree()
