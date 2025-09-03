@@ -46,6 +46,17 @@ class TaxonomyExporter(ABC):
         issues = tree.validate_tree()
         if issues:
             raise ExportError(f"Tree validation failed: {'; '.join(issues)}")
+    
+    def _validate_file(self, file_path: Path) -> None:
+        """Validate that a file path exists and is readable."""
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+        
+        if not file_path.is_file():
+            raise ExportError(f"Path is not a file: {file_path}")
+        
+        if not file_path.stat().st_size >= 0:  # Check if we can read file stats
+            raise ExportError(f"Cannot access file: {file_path}")
 
     def _ensure_output_path(
         self, output_path: Path, is_directory: Optional[bool] = None
@@ -55,7 +66,12 @@ class TaxonomyExporter(ABC):
             is_directory = self.requires_directory
 
         if is_directory:
-            output_path.mkdir(parents=True, exist_ok=True)
+            try:
+                output_path.mkdir(parents=True, exist_ok=True)
+            except FileExistsError:
+                # File exists with same name - this is an error for directory creation
+                if not output_path.is_dir():
+                    raise ExportError(f"Cannot create directory - file exists: {output_path}")
             if not output_path.is_dir():
                 raise ExportError(f"Output path is not a directory: {output_path}")
         else:

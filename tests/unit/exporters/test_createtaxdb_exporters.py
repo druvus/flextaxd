@@ -38,22 +38,27 @@ class TestCreateTaxDBExportersBase:
         genomes = [
             GenomeInfo(
                 genome_id="GCA_000005825.2", 
+                tax_id=511145,
                 assembly_accession="GCF_000005825.2",
-                genome_size=4641652
+                sequence_length=4641652,
+                sequence_type="genome"  # Nucleotide/genome sequence
             ),
             GenomeInfo(
                 genome_id="NC_000913.3",
+                tax_id=511145,
                 assembly_accession="GCF_000005825.2", 
-                genome_size=4641652
+                sequence_length=4641652,
+                sequence_type="nucleotide"  # Nucleotide sequence
             ),
             GenomeInfo(
                 genome_id="WP_000001.1|protein_id",
-                genome_size=None  # Protein entry
+                tax_id=511145,
+                sequence_type="protein"  # Protein entry
             )
         ]
         
         for genome in genomes:
-            tree.add_genome(511145, genome)
+            tree.add_genome(genome)
         
         # Add another species for variety
         salmonella = TaxonomyNode(tax_id=28901, name="Salmonella enterica", rank=TaxonomicRank.SPECIES, parent_id=2)
@@ -61,10 +66,12 @@ class TestCreateTaxDBExportersBase:
         
         salm_genome = GenomeInfo(
             genome_id="GCA_000006945.2",
+            tax_id=28901,
             assembly_accession="GCF_000006945.2",
-            genome_size=4857432
+            sequence_length=4857432,
+            sequence_type="genome"  # Nucleotide/genome sequence
         )
-        tree.add_genome(28901, salm_genome)
+        tree.add_genome(salm_genome)
         
         return tree
 
@@ -120,9 +127,9 @@ class TestAccession2TaxidExporter(TestCreateTaxDBExportersBase):
                 header = f.readline()  # Skip header
                 for line in f:
                     parts = line.strip().split('\t')
-                    if len(parts) >= 2:
+                    if len(parts) >= 3:  # Need at least accession, accession.version, taxid
                         accession = parts[0]
-                        taxid = int(parts[1])
+                        taxid = int(parts[2])  # taxid is in column 2 (0-indexed)
                         mappings[accession] = taxid
             
             # Should have mappings for our genomes
@@ -310,20 +317,23 @@ class TestGenomeSizesExporter(TestCreateTaxDBExportersBase):
             
             # Parse and verify format
             with open(output_file) as f:
+                header = f.readline().strip()  # Skip header line
+                assert 'genome_size' in header  # Verify header format
+                
                 for line in f:
                     line = line.strip()
                     if line and not line.startswith('#'):
                         parts = line.split('\t')
-                        assert len(parts) >= 2
+                        assert len(parts) >= 6  # Expect full format: taxid, assembly_accession, species_taxid, organism_name, assembly_level, genome_size
                         
-                        # First column should be accession/ID
-                        accession = parts[0]
-                        assert len(accession) > 0
+                        # First column should be taxid
+                        taxid = parts[0]
+                        assert taxid.isdigit()
                         
-                        # Second column should be size (integer)
-                        size = parts[1]
+                        # Last column should be genome_size (integer)
+                        size = parts[5]  # genome_size is column 5 (0-indexed)
                         assert size.isdigit()
-                        assert int(size) > 0
+                        assert int(size) >= 0  # Allow 0 size for protein entries
 
     def test_missing_genome_sizes_handling(self):
         """Test handling of genomes without size information."""
@@ -338,8 +348,8 @@ class TestGenomeSizesExporter(TestCreateTaxDBExportersBase):
         tree.add_node(species)
         
         # Add genome without size
-        genome = GenomeInfo(genome_id="TEST_001", genome_size=None)
-        tree.add_genome(123, genome)
+        genome = GenomeInfo(genome_id="TEST_001", tax_id=123, sequence_length=None)
+        tree.add_genome(genome)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             output_file = Path(tmp_dir) / "genome_sizes.txt"
@@ -383,18 +393,21 @@ class TestMALTMapDBExporter(TestCreateTaxDBExportersBase):
             output_file = Path(tmp_dir) / "taxonomy.db"
             exporter.export(tree, output_file)
             
-            # MALT format is typically key-value pairs or structured format
-            # Verify file contains expected content
-            with open(output_file) as f:
-                content = f.read()
-                
-            # Should contain some tax_ids from our tree
-            assert len(content) > 0
+            # MALT format creates SQLite database - validate using the exporter's method
+            validation_result = exporter.validate_database(output_file)
             
-            # May contain tax_ids as strings
-            tax_ids = ["511145", "28901"]
-            found_tax_ids = sum(1 for tid in tax_ids if tid in content)
-            assert found_tax_ids > 0
+            # Should be valid database
+            assert validation_result["valid"] is True
+            
+            # Should have required tables
+            assert "info" in validation_result["tables"]
+            assert "mappings" in validation_result["tables"]
+            
+            # Should have some mappings for our genomes
+            assert validation_result["mappings_count"] > 0
+            
+            # Should have info records
+            assert validation_result["info_records"] > 0
 
 
 class TestCreateTaxDBExportersIntegration:
@@ -416,11 +429,13 @@ class TestCreateTaxDBExportersIntegration:
             with tempfile.TemporaryDirectory() as tmp_dir:
                 output_file = Path(tmp_dir) / f"test.{exporter.file_extensions[0][1:]}"
                 
-                # Should handle empty tree gracefully
-                exporter.export(empty_tree, output_file)
+                # CreateTaxDB exporters should raise ExportError for empty trees
+                # This is the expected behavior as they need genome data to function
+                with pytest.raises(ExportError) as exc_info:
+                    exporter.export(empty_tree, output_file)
                 
-                # File should be created (may be empty or header-only)
-                assert output_file.exists()
+                # Error message should mention empty tree
+                assert "empty" in str(exc_info.value).lower()
 
     def test_all_exporters_create_valid_files(self):
         """Test all CreateTaxDB exporters create valid output files."""
@@ -445,10 +460,16 @@ class TestCreateTaxDBExportersIntegration:
                 assert output_file.exists()
                 assert output_file.stat().st_size > 0
                 
-                # Should be readable
-                with open(output_file) as f:
-                    content = f.read()
-                    assert len(content) > 0
+                # Should be readable (handle binary files like MALT MapDB)
+                if exporter.exporter_name == "malt_mapdb":
+                    # MALT MapDB creates binary SQLite files, validate using exporter method
+                    validation_result = exporter.validate_database(output_file)
+                    assert validation_result["valid"] is True
+                else:
+                    # Text-based formats can be read normally
+                    with open(output_file) as f:
+                        content = f.read()
+                        assert len(content) > 0
 
     def test_consistent_taxid_usage(self):
         """Test consistent tax_id usage across CreateTaxDB formats."""

@@ -38,8 +38,8 @@ class TestClassicExportersBase:
         tree.add_node(ecoli)
         
         # Add genomes
-        genome1 = GenomeInfo(genome_id="GCA_000005825.2", assembly_accession="GCF_000005825.2")
-        tree.add_genome(511145, genome1)
+        genome1 = GenomeInfo(genome_id="GCA_000005825.2", tax_id=511145, assembly_accession="GCF_000005825.2")
+        tree.add_genome(genome1)
         
         return tree
 
@@ -220,9 +220,10 @@ class TestGanonExporter(TestClassicExportersBase):
             # Export
             exporter.export(tree, output_path)
             
-            # Check required files
-            assert (output_path / "names.dmp").exists()
-            assert (output_path / "nodes.dmp").exists()
+            # Check required files (Ganon creates files in taxonomy/ subdirectory)
+            assert (output_path / "taxonomy" / "names.dmp").exists()
+            assert (output_path / "taxonomy" / "nodes.dmp").exists()
+            assert (output_path / "taxonomy.tax").exists()
 
     def test_ganon_format_compatibility(self):
         """Test Ganon format compatibility with hierarchical classification."""
@@ -235,7 +236,7 @@ class TestGanonExporter(TestClassicExportersBase):
             
             # Verify hierarchical structure is maintained
             parent_child_map = {}
-            with open(output_path / "nodes.dmp") as f:
+            with open(output_path / "taxonomy" / "nodes.dmp") as f:
                 for line in f:
                     parts = line.split("\t|\t")
                     child_id = int(parts[0])

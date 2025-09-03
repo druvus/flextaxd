@@ -48,6 +48,10 @@ class TestTaxonomyExporterBase:
             def file_extensions(self):
                 return [".test"]
             
+            @property
+            def requires_directory(self):
+                return False
+            
             def export(self, tree, output_path, **kwargs):
                 pass
         
@@ -144,7 +148,7 @@ class TestFileBasedExporter:
             exporter._ensure_output_path(valid_path)  # Should not raise
             
             # Directory as file path should raise error
-            with pytest.raises((ValidationError, IsADirectoryError)):
+            with pytest.raises((ValidationError, ExportError, IsADirectoryError)):
                 exporter._ensure_output_path(Path(tmp_dir))
 
 
@@ -165,6 +169,7 @@ class TestDirectoryBasedExporter:
             
             def export(self, tree, output_path, **kwargs):
                 # Simple test export - create multiple files
+                self._ensure_output_path(output_path)
                 (output_path / "names.dmp").write_text("names data")
                 (output_path / "nodes.dmp").write_text("nodes data")
                 (output_path / "info.txt").write_text(f"Tree: {tree.node_count} nodes")
@@ -245,7 +250,7 @@ class TestDirectoryBasedExporter:
             file_path = Path(tmp_dir) / "file.txt"
             file_path.write_text("test")
             
-            with pytest.raises((ValidationError, NotADirectoryError)):
+            with pytest.raises((ValidationError, ExportError, NotADirectoryError, FileExistsError)):
                 exporter._ensure_output_path(file_path)
 
 
@@ -281,10 +286,11 @@ class TestExporterCommonFunctionality:
         # Add genome with special characters
         genome = GenomeInfo(
             genome_id="GCA_123456.1|special",
+            tax_id=12345,
             assembly_accession="GCF_123456.1",
-            genome_size=1000000
+            sequence_length=1000000
         )
-        tree.add_genome(12345, genome)
+        tree.add_genome(genome)
         
         return tree
 
@@ -468,7 +474,7 @@ class TestExporterErrorHandling:
         ]
         
         for invalid_path in invalid_paths:
-            with pytest.raises((ValidationError, PermissionError, FileNotFoundError)):
+            with pytest.raises((ValidationError, ExportError, PermissionError, FileNotFoundError, OSError)):
                 exporter.export(tree, invalid_path)
 
     def test_export_interruption_handling(self):

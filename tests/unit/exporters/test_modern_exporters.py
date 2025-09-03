@@ -33,8 +33,8 @@ class TestModernExportersBase:
         tree.add_node(escherichia)
         
         # Add genome
-        genome = GenomeInfo(genome_id="GCA_000005825.2", assembly_accession="GCF_000005825.2")
-        tree.add_genome(511145, genome)
+        genome = GenomeInfo(genome_id="GCA_000005825.2", tax_id=511145, assembly_accession="GCF_000005825.2")
+        tree.add_genome(genome)
         
         return tree
 
