@@ -15,12 +15,14 @@ class CreateCommand(BaseCommand):
     """Command to create a new taxonomy database."""
 
     @classmethod
-    def register_parser(cls, subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]") -> argparse.ArgumentParser:
+    def register_parser(
+        cls, subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]"
+    ) -> argparse.ArgumentParser:
         """Register the create command parser."""
         parser = subparsers.add_parser(
-            'create',
-            help='Create a new taxonomy database',
-            description='Create a new taxonomy database from input files',
+            "create",
+            help="Create a new taxonomy database",
+            description="Create a new taxonomy database from input files",
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
@@ -29,100 +31,95 @@ Examples:
   flextaxd create --input gtdb_taxonomy.tsv --format gtdb --database gtdb_db.ftd
   flextaxd create --input silva_taxonomy.txt --format silva --database silva_db.ftd
   flextaxd create --input cansnper.tree --format cansnper --database cansnper_db.ftd
-            """
+            """,
         )
 
         # Input options
-        input_group = parser.add_argument_group('Input options')
+        input_group = parser.add_argument_group("Input options")
         input_group.add_argument(
-            '--input', '-i',
+            "--input",
+            "-i",
             type=str,
             required=True,
-            help='Input taxonomy file or directory'
+            help="Input taxonomy file or directory",
         )
 
         input_group.add_argument(
-            '--format', '-f',
+            "--format",
+            "-f",
             type=str,
-            choices=['auto', 'tsv', 'ncbi', 'qiime', 'gtdb', 'silva', 'cansnper'],
-            default='auto',
-            help='Input format (default: auto-detect)'
+            choices=["auto", "tsv", "ncbi", "qiime", "gtdb", "silva", "cansnper"],
+            default="auto",
+            help="Input format (default: auto-detect)",
         )
 
         # Database options
-        db_group = parser.add_argument_group('Database options')
+        db_group = parser.add_argument_group("Database options")
         db_group.add_argument(
-            '--database', '-d',
+            "--database",
+            "-d",
             type=str,
             required=True,
-            help='Output database file path (.ftd)'
+            help="Output database file path (.ftd)",
         )
 
         db_group.add_argument(
-            '--overwrite',
-            action='store_true',
-            help='Overwrite existing database'
+            "--overwrite", action="store_true", help="Overwrite existing database"
         )
 
         # Parser-specific options
-        parser_group = parser.add_argument_group('Parser options')
+        parser_group = parser.add_argument_group("Parser options")
         parser_group.add_argument(
-            '--no-header',
-            action='store_true',
-            help='Input file has no header row'
+            "--no-header", action="store_true", help="Input file has no header row"
         )
 
         parser_group.add_argument(
-            '--parent-column',
+            "--parent-column",
             type=int,
             default=0,
-            help='Column index for parent names (0-based, default: 0)'
+            help="Column index for parent names (0-based, default: 0)",
         )
 
         parser_group.add_argument(
-            '--child-column',
+            "--child-column",
             type=int,
             default=1,
-            help='Column index for child names (0-based, default: 1)'
+            help="Column index for child names (0-based, default: 1)",
         )
 
         parser_group.add_argument(
-            '--id-column',
-            type=int,
-            help='Column index for taxonomic IDs'
+            "--id-column", type=int, help="Column index for taxonomic IDs"
         )
 
         parser_group.add_argument(
-            '--rank-column',
-            type=int,
-            help='Column index for taxonomic ranks'
+            "--rank-column", type=int, help="Column index for taxonomic ranks"
         )
 
         # Genome integration options
-        genome_group = parser.add_argument_group('Genome integration options')
+        genome_group = parser.add_argument_group("Genome integration options")
         genome_group.add_argument(
-            '--genomeid2taxid',
+            "--genomeid2taxid",
             type=str,
-            help='File mapping genome/sequence IDs to taxonomy IDs'
+            help="File mapping genome/sequence IDs to taxonomy IDs",
         )
 
         genome_group.add_argument(
-            '--genomes-path',
+            "--genomes-path",
             type=str,
-            help='Directory containing genome sequence files'
+            help="Directory containing genome sequence files",
         )
 
         genome_group.add_argument(
-            '--auto-detect-sequences',
-            action='store_true',
-            help='Automatically detect sequences from FASTA headers'
+            "--auto-detect-sequences",
+            action="store_true",
+            help="Automatically detect sequences from FASTA headers",
         )
 
         genome_group.add_argument(
-            '--sequence-type',
-            choices=['genome', '16S', 'plasmid', 'other'],
-            default='genome',
-            help='Type of sequences being processed (default: genome)'
+            "--sequence-type",
+            choices=["genome", "16S", "plasmid", "other"],
+            default="genome",
+            help="Type of sequences being processed (default: genome)",
         )
 
         return parser
@@ -154,8 +151,12 @@ Examples:
             )
 
             parser_classes = [
-                TSVTaxonomyParser, NCBITaxonomyParser, QIIMETaxonomyParser,
-                GTDBTaxonomyParser, SILVATaxonomyParser, CanSNPerTaxonomyParser
+                TSVTaxonomyParser,
+                NCBITaxonomyParser,
+                QIIMETaxonomyParser,
+                GTDBTaxonomyParser,
+                SILVATaxonomyParser,
+                CanSNPerTaxonomyParser,
             ]
 
             for parser_class in parser_classes:
@@ -169,10 +170,12 @@ Examples:
             input_path = Path(args.input)
             parser = None
 
-            if args.format == 'auto':
+            if args.format == "auto":
                 parser = registry.find_parser(input_path)
                 if parser is None:
-                    raise ValidationError(f"Cannot auto-detect format for: {args.input}")
+                    raise ValidationError(
+                        f"Cannot auto-detect format for: {args.input}"
+                    )
                 self.logger.info(f"Auto-detected format: {parser.parser_name}")
             else:
                 # Use format directly - no more aliases needed with proper GTDB parser
@@ -192,7 +195,10 @@ Examples:
 
                     # Try auto-detection to suggest the correct format
                     suggested_parser = registry.find_parser(input_path)
-                    if suggested_parser and suggested_parser.parser_name != parser.parser_name:
+                    if (
+                        suggested_parser
+                        and suggested_parser.parser_name != parser.parser_name
+                    ):
                         raise ValidationError(
                             f"Input file does not match specified format '{args.format}'. "
                             f"Auto-detection suggests format '{suggested_parser.parser_name}'. "
@@ -206,24 +212,22 @@ Examples:
 
             # Prepare parser options
             parser_options = {
-                'has_header': not args.no_header,
-                'parent_column': args.parent_column,
-                'child_column': args.child_column,
+                "has_header": not args.no_header,
+                "parent_column": args.parent_column,
+                "child_column": args.child_column,
             }
 
             if args.id_column is not None:
-                parser_options['id_column'] = args.id_column
+                parser_options["id_column"] = args.id_column
 
             if args.rank_column is not None:
-                parser_options['rank_column'] = args.rank_column
+                parser_options["rank_column"] = args.rank_column
 
             # Parse taxonomy file
             self.logger.info(f"Parsing taxonomy file: {args.input}")
             tree = parser.parse(input_path, **parser_options)
 
-            self.logger.info(
-                f"Parsed taxonomy tree with {tree.node_count} nodes"
-            )
+            self.logger.info(f"Parsed taxonomy tree with {tree.node_count} nodes")
 
             # Process genome integration if provided
             if args.genomeid2taxid or args.genomes_path:
@@ -243,14 +247,14 @@ Examples:
                 print(f"Created database: {args.database}")
                 print(f"  Nodes: {stats['node_count']}")
                 print(f"  Genomes: {stats['genome_count']}")
-                if 'root_count' in stats:
+                if "root_count" in stats:
                     print(f"  Root nodes: {stats['root_count']}")
-                if 'leaf_count' in stats:
+                if "leaf_count" in stats:
                     print(f"  Leaf nodes: {stats['leaf_count']}")
 
-                if stats['rank_distribution']:
+                if stats["rank_distribution"]:
                     print("  Rank distribution:")
-                    for rank, count in stats['rank_distribution'].items():
+                    for rank, count in stats["rank_distribution"].items():
                         print(f"    {rank}: {count}")
 
             return 0
@@ -265,7 +269,9 @@ Examples:
             print(f"Parse error: {e.message}")
             return 1
 
-    def _process_genome_integration(self, tree: TaxonomyTree, args: argparse.Namespace) -> None:
+    def _process_genome_integration(
+        self, tree: TaxonomyTree, args: argparse.Namespace
+    ) -> None:
         """Process genome integration with sequence ID mapping."""
         from ...core.models import GenomeInfo
         from ...utils.sequence_utils import GenomeDirectoryManager, SeqIDMappingManager
@@ -289,17 +295,25 @@ Examples:
         if args.genomeid2taxid:
             mapping_file = Path(args.genomeid2taxid)
             if not mapping_file.exists():
-                raise ValidationError(f"Genome mapping file not found: {args.genomeid2taxid}")
+                raise ValidationError(
+                    f"Genome mapping file not found: {args.genomeid2taxid}"
+                )
 
-            self.logger.info(f"Loading sequence ID mappings from: {args.genomeid2taxid}")
+            self.logger.info(
+                f"Loading sequence ID mappings from: {args.genomeid2taxid}"
+            )
             seqid_manager.load_seqid_mapping_file(mapping_file)
 
             mapping_stats = seqid_manager.get_statistics()
-            self.logger.info(f"Loaded {mapping_stats['total_mappings']} sequence mappings")
+            self.logger.info(
+                f"Loaded {mapping_stats['total_mappings']} sequence mappings"
+            )
 
         # Process auto-detection of sequences from FASTA files
         if args.auto_detect_sequences and genome_manager:
-            self._auto_detect_sequences_from_genomes(tree, genome_manager, seqid_manager, args)
+            self._auto_detect_sequences_from_genomes(
+                tree, genome_manager, seqid_manager, args
+            )
 
         # Add genome information to taxonomy tree
         genomes_added = 0
@@ -307,7 +321,9 @@ Examples:
             # Find corresponding taxonomy node
             tax_node = tree.get_node(mapping.taxonomy_id)
             if not tax_node:
-                self.logger.warning(f"Taxonomy node {mapping.taxonomy_id} not found for sequence {seq_id}")
+                self.logger.warning(
+                    f"Taxonomy node {mapping.taxonomy_id} not found for sequence {seq_id}"
+                )
                 continue
 
             # Get genome file path if available
@@ -323,7 +339,7 @@ Examples:
                 tax_id=mapping.taxonomy_id,
                 file_path=file_path,
                 sequence_type=args.sequence_type,
-                source=mapping.source
+                source=mapping.source,
             )
 
             # Add to tree
@@ -332,7 +348,13 @@ Examples:
 
         self.logger.info(f"Added {genomes_added} genome associations to taxonomy tree")
 
-    def _auto_detect_sequences_from_genomes(self, tree: TaxonomyTree, genome_manager: Any, seqid_manager: Any, args: argparse.Namespace) -> None:
+    def _auto_detect_sequences_from_genomes(
+        self,
+        tree: TaxonomyTree,
+        genome_manager: Any,
+        seqid_manager: Any,
+        args: argparse.Namespace,
+    ) -> None:
         """Auto-detect sequence IDs from genome FASTA files."""
         from ...utils.sequence_utils import FASTAProcessor
 
@@ -344,8 +366,10 @@ Examples:
         for genome_id, file_path in genome_manager.genome_files.items():
             try:
                 # Only process FASTA files
-                if not any(str(file_path).lower().endswith(ext)
-                          for ext in ['.fasta', '.fa', '.fna', '.ffn', '.faa']):
+                if not any(
+                    str(file_path).lower().endswith(ext)
+                    for ext in [".fasta", ".fa", ".fna", ".ffn", ".faa"]
+                ):
                     continue
 
                 # Parse FASTA headers
@@ -360,7 +384,10 @@ Examples:
                     # Try to find taxonomy node by name matching
                     matching_nodes = []
                     for node in tree:
-                        if genome_id.lower() in node.name.lower() or node.name.lower() in genome_id.lower():
+                        if (
+                            genome_id.lower() in node.name.lower()
+                            or node.name.lower() in genome_id.lower()
+                        ):
                             matching_nodes.append(node)
 
                     if matching_nodes:
@@ -369,10 +396,11 @@ Examples:
 
                         # Add to seqid manager
                         from ...utils.sequence_utils import SeqIDMapping
+
                         mapping = SeqIDMapping(
                             seq_info.sequence_id,
                             best_match.tax_id,
-                            f"auto-detected from {file_path}"
+                            f"auto-detected from {file_path}",
                         )
                         seqid_manager.mappings[seq_info.sequence_id] = mapping
                         sequences_detected += 1

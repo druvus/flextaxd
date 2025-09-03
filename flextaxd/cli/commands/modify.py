@@ -13,119 +13,104 @@ class ModifyCommand(BaseCommand):
     """Command to modify existing taxonomy databases."""
 
     @classmethod
-    def register_parser(cls, subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]") -> argparse.ArgumentParser:
+    def register_parser(
+        cls, subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]"
+    ) -> argparse.ArgumentParser:
         """Register the modify command parser."""
         parser = subparsers.add_parser(
-            'modify',
-            help='Modify an existing taxonomy database',
-            description='Add, remove, or update nodes in a taxonomy database',
+            "modify",
+            help="Modify an existing taxonomy database",
+            description="Add, remove, or update nodes in a taxonomy database",
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
   flextaxd modify --database my_db.ftd --add-node "New Species" --parent-id 12345
   flextaxd modify --database my_db.ftd --remove-node 67890
   flextaxd modify --database my_db.ftd --update-node 12345 --new-name "Updated Name"
-            """
+            """,
         )
 
         parser.add_argument(
-            '--database', '-d',
+            "--database",
+            "-d",
             type=str,
             required=True,
-            help='Database file path (.ftd)'
+            help="Database file path (.ftd)",
         )
 
         # Modification operations (mutually exclusive)
         operation_group = parser.add_mutually_exclusive_group(required=True)
 
         operation_group.add_argument(
-            '--add-node',
-            type=str,
-            help='Add a new node with the given name'
+            "--add-node", type=str, help="Add a new node with the given name"
         )
 
         operation_group.add_argument(
-            '--remove-node',
-            type=int,
-            help='Remove node with the given taxonomic ID'
+            "--remove-node", type=int, help="Remove node with the given taxonomic ID"
         )
 
         operation_group.add_argument(
-            '--mod-file',
-            type=str,
-            help='Import taxonomy from another file'
+            "--mod-file", type=str, help="Import taxonomy from another file"
         )
 
         operation_group.add_argument(
-            '--merge-database',
-            type=str,
-            help='Merge another database into this one'
+            "--merge-database", type=str, help="Merge another database into this one"
         )
 
         operation_group.add_argument(
-            '--update-node',
-            type=int,
-            help='Update node with the given taxonomic ID'
+            "--update-node", type=int, help="Update node with the given taxonomic ID"
         )
 
         # Node properties
         parser.add_argument(
-            '--parent-id',
-            type=int,
-            help='Parent taxonomic ID for new or updated node'
+            "--parent-id", type=int, help="Parent taxonomic ID for new or updated node"
         )
 
         parser.add_argument(
-            '--rank',
+            "--rank",
             type=str,
             choices=[rank.value for rank in TaxonomicRank],
-            help='Taxonomic rank for new or updated node'
+            help="Taxonomic rank for new or updated node",
         )
 
-        parser.add_argument(
-            '--new-name',
-            type=str,
-            help='New name for updated node'
-        )
+        parser.add_argument("--new-name", type=str, help="New name for updated node")
 
         parser.add_argument(
-            '--new-id',
+            "--new-id",
             type=int,
-            help='New taxonomic ID for the node (use with caution)'
+            help="New taxonomic ID for the node (use with caution)",
         )
 
         # Database merging parameters
         parser.add_argument(
-            '--parent',
-            type=str,
-            help='Parent node name for merging operations'
+            "--parent", type=str, help="Parent node name for merging operations"
         )
 
         parser.add_argument(
-            '--replace',
-            action='store_true',
-            help='Replace existing branch when merging'
+            "--replace",
+            action="store_true",
+            help="Replace existing branch when merging",
         )
 
         parser.add_argument(
-            '--format',
+            "--format",
             type=str,
-            choices=['auto', 'tsv', 'ncbi', 'qiime', 'gtdb', 'silva', 'cansnper'],
-            default='auto',
-            help='Format of the input file for --mod-file (default: auto-detect)'
+            choices=["auto", "tsv", "ncbi", "qiime", "gtdb", "silva", "cansnper"],
+            default="auto",
+            help="Format of the input file for --mod-file (default: auto-detect)",
         )
 
         # Options
         parser.add_argument(
-            '--force',
-            action='store_true',
-            help='Force operation even if it might break tree structure'
+            "--force",
+            action="store_true",
+            help="Force operation even if it might break tree structure",
         )
 
         parser.add_argument(
-            '--dry-run',
-            action='store_true',
-            help='Show what would be done without making changes'
+            "--dry-run",
+            action="store_true",
+            help="Show what would be done without making changes",
         )
 
         return parser
@@ -160,7 +145,9 @@ Examples:
             print(f"Database error: {e.message}")
             return 1
 
-    def _add_node(self, repository: TaxonomyRepository, args: argparse.Namespace) -> int:
+    def _add_node(
+        self, repository: TaxonomyRepository, args: argparse.Namespace
+    ) -> int:
         """Add a new node to the database."""
         if not args.parent_id:
             raise ValidationError("--parent-id is required when adding a node")
@@ -173,7 +160,7 @@ Examples:
         # Determine taxonomic ID for new node
         # In a real implementation, you'd want a more sophisticated ID assignment
         stats = repository.get_statistics()
-        new_tax_id = args.new_id if args.new_id else stats['node_count'] + 1000
+        new_tax_id = args.new_id if args.new_id else stats["node_count"] + 1000
 
         # Check if ID already exists
         if repository.get_node(new_tax_id):
@@ -186,14 +173,13 @@ Examples:
 
         # Validate that node is not becoming its own parent
         if args.parent_id == new_tax_id:
-            raise ValidationError(f"Cannot add node '{args.add_node}' (ID: {new_tax_id}) - would create circular reference (node as its own parent)")
+            raise ValidationError(
+                f"Cannot add node '{args.add_node}' (ID: {new_tax_id}) - would create circular reference (node as its own parent)"
+            )
 
         # Create new node
         new_node = TaxonomyNode(
-            tax_id=new_tax_id,
-            name=args.add_node,
-            rank=rank,
-            parent_id=args.parent_id
+            tax_id=new_tax_id, name=args.add_node, rank=rank, parent_id=args.parent_id
         )
 
         if args.dry_run:
@@ -206,7 +192,9 @@ Examples:
         print(f"Added node: {new_node.name} (ID: {new_node.tax_id})")
         return 0
 
-    def _remove_node(self, repository: TaxonomyRepository, args: argparse.Namespace) -> int:
+    def _remove_node(
+        self, repository: TaxonomyRepository, args: argparse.Namespace
+    ) -> int:
         """Remove a node from the database."""
         node = repository.get_node(args.remove_node)
         if not node:
@@ -232,7 +220,9 @@ Examples:
             print(f"  Warning: {len(children)} children were orphaned")
         return 0
 
-    def _update_node(self, repository: TaxonomyRepository, args: argparse.Namespace) -> int:
+    def _update_node(
+        self, repository: TaxonomyRepository, args: argparse.Namespace
+    ) -> int:
         """Update an existing node in the database."""
         node = repository.get_node(args.update_node)
         if not node:
@@ -251,14 +241,13 @@ Examples:
 
         # Validate that node is not becoming its own parent
         if new_parent_id == node.tax_id:
-            raise ValidationError(f"Cannot update node '{node.name}' (ID: {node.tax_id}) - would create circular reference (node as its own parent)")
+            raise ValidationError(
+                f"Cannot update node '{node.name}' (ID: {node.tax_id}) - would create circular reference (node as its own parent)"
+            )
 
         # Create updated node
         updated_node = TaxonomyNode(
-            tax_id=node.tax_id,
-            name=new_name,
-            rank=new_rank,
-            parent_id=new_parent_id
+            tax_id=node.tax_id, name=new_name, rank=new_rank, parent_id=new_parent_id
         )
 
         if args.dry_run:
@@ -272,7 +261,9 @@ Examples:
         print(f"Updated node: {updated_node.name} (ID: {updated_node.tax_id})")
         return 0
 
-    def _import_from_file(self, repository: TaxonomyRepository, args: argparse.Namespace) -> int:
+    def _import_from_file(
+        self, repository: TaxonomyRepository, args: argparse.Namespace
+    ) -> int:
         """Import taxonomy from another file."""
         from pathlib import Path
 
@@ -292,8 +283,11 @@ Examples:
 
         # Register parsers
         parser_classes = [
-            TSVTaxonomyParser, NCBITaxonomyParser, QIIMETaxonomyParser,
-            SILVATaxonomyParser, CanSNPerTaxonomyParser
+            TSVTaxonomyParser,
+            NCBITaxonomyParser,
+            QIIMETaxonomyParser,
+            SILVATaxonomyParser,
+            CanSNPerTaxonomyParser,
         ]
         for parser_class in parser_classes:
             try:
@@ -302,7 +296,7 @@ Examples:
                 pass  # Already registered
 
         # Find appropriate parser
-        if args.format == 'auto':
+        if args.format == "auto":
             parser = registry.find_parser(mod_file)
             if parser is None:
                 raise ValidationError(f"Cannot auto-detect format for: {args.mod_file}")
@@ -325,7 +319,10 @@ Examples:
 
                 # Try auto-detection to suggest the correct format
                 suggested_parser = registry.find_parser(mod_file)
-                if suggested_parser and suggested_parser.parser_name != parser.parser_name:
+                if (
+                    suggested_parser
+                    and suggested_parser.parser_name != parser.parser_name
+                ):
                     raise ValidationError(
                         f"Modification file does not match specified format '{args.format}'. "
                         f"Auto-detection suggests format '{suggested_parser.parser_name}'. "
@@ -354,7 +351,9 @@ Examples:
                     break
 
             if parent_node is None:
-                raise ValidationError(f"Parent node '{args.parent}' not found in database")
+                raise ValidationError(
+                    f"Parent node '{args.parent}' not found in database"
+                )
 
         # Create name-to-ID mapping for existing database nodes
         existing_name_to_id = {}
@@ -373,7 +372,9 @@ Examples:
         if args.dry_run:
             print(f"Would import {mod_tree.node_count} nodes from {args.mod_file}")
             if parent_node:
-                print(f"Would attach to parent: {parent_node.name} (ID: {parent_node.tax_id})")
+                print(
+                    f"Would attach to parent: {parent_node.name} (ID: {parent_node.tax_id})"
+                )
             return 0
 
         for mod_node in mod_tree:
@@ -387,16 +388,22 @@ Examples:
                     # Check if this parent is a root node that should be attached to --parent
                     if parent_node and mod_parent.parent_id is None:
                         # This parent is a root in modification tree, attach it to specified parent
-                        adjusted_parent_id = existing_name_to_id.get(mod_parent.name.lower(), parent_node.tax_id)
+                        adjusted_parent_id = existing_name_to_id.get(
+                            mod_parent.name.lower(), parent_node.tax_id
+                        )
                     else:
                         # Look up this parent name in the existing database or newly added nodes
-                        existing_parent_id = existing_name_to_id.get(mod_parent.name.lower())
+                        existing_parent_id = existing_name_to_id.get(
+                            mod_parent.name.lower()
+                        )
                         if existing_parent_id:
                             adjusted_parent_id = existing_parent_id
                         else:
                             # Parent doesn't exist in database yet - might be added by this import
                             # We'll handle this in a second pass
-                            self.logger.warning(f"Parent '{mod_parent.name}' not found in existing database for node '{mod_node.name}'")
+                            self.logger.warning(
+                                f"Parent '{mod_parent.name}' not found in existing database for node '{mod_node.name}'"
+                            )
                             continue
             elif parent_node:
                 # Root node in modification tree - attach to specified parent
@@ -404,13 +411,17 @@ Examples:
 
             # Check if node with same name already exists (by name, not tax_id)
             existing_node_id = existing_name_to_id.get(mod_node.name.lower())
-            existing_node = current_tree.get_node(existing_node_id) if existing_node_id else None
+            existing_node = (
+                current_tree.get_node(existing_node_id) if existing_node_id else None
+            )
 
             if existing_node:
                 if args.replace:
                     # Validate that node is not becoming its own parent
                     if adjusted_parent_id == existing_node.tax_id:
-                        self.logger.error(f"Cannot replace node '{mod_node.name}' (ID: {existing_node.tax_id}) - would create circular reference (node as its own parent)")
+                        self.logger.error(
+                            f"Cannot replace node '{mod_node.name}' (ID: {existing_node.tax_id}) - would create circular reference (node as its own parent)"
+                        )
                         continue
 
                     # Update existing node
@@ -418,13 +429,15 @@ Examples:
                         tax_id=existing_node.tax_id,  # Keep original database ID
                         name=mod_node.name,
                         rank=mod_node.rank,
-                        parent_id=adjusted_parent_id
+                        parent_id=adjusted_parent_id,
                     )
                     repository.update_node(updated_node)
                     current_tree._nodes[existing_node.tax_id] = updated_node
                     nodes_updated += 1
                 else:
-                    self.logger.warning(f"Node '{mod_node.name}' already exists, skipping")
+                    self.logger.warning(
+                        f"Node '{mod_node.name}' already exists, skipping"
+                    )
             else:
                 # Add new node with a safe, non-conflicting ID
                 new_tax_id = next_available_id
@@ -432,18 +445,22 @@ Examples:
 
                 # Validate that new node is not becoming its own parent
                 if adjusted_parent_id == new_tax_id:
-                    self.logger.error(f"Cannot add node '{mod_node.name}' (ID: {new_tax_id}) - would create circular reference (node as its own parent)")
+                    self.logger.error(
+                        f"Cannot add node '{mod_node.name}' (ID: {new_tax_id}) - would create circular reference (node as its own parent)"
+                    )
                     continue
 
                 new_node = TaxonomyNode(
                     tax_id=new_tax_id,
                     name=mod_node.name,
                     rank=mod_node.rank,
-                    parent_id=adjusted_parent_id
+                    parent_id=adjusted_parent_id,
                 )
                 repository.add_node(new_node)
                 current_tree.add_node(new_node)
-                existing_name_to_id[mod_node.name.lower()] = new_tax_id  # Update mapping
+                existing_name_to_id[mod_node.name.lower()] = (
+                    new_tax_id  # Update mapping
+                )
                 nodes_added += 1
 
         print("Import completed:")
@@ -452,7 +469,9 @@ Examples:
 
         return 0
 
-    def _merge_database(self, repository: TaxonomyRepository, args: argparse.Namespace) -> int:
+    def _merge_database(
+        self, repository: TaxonomyRepository, args: argparse.Namespace
+    ) -> int:
         """Merge another database into this one."""
         from pathlib import Path
 
@@ -477,14 +496,20 @@ Examples:
                     break
 
             if parent_node is None:
-                raise ValidationError(f"Parent node '{args.parent}' not found in database")
+                raise ValidationError(
+                    f"Parent node '{args.parent}' not found in database"
+                )
 
         # Handle replacement if requested
         if args.replace and parent_node:
             if args.dry_run:
                 descendants = repository.get_descendants(parent_node.tax_id)
-                print(f"Would replace {len(descendants)} descendants of {parent_node.name}")
-                print(f"Would merge {source_tree.node_count} nodes from source database")
+                print(
+                    f"Would replace {len(descendants)} descendants of {parent_node.name}"
+                )
+                print(
+                    f"Would merge {source_tree.node_count} nodes from source database"
+                )
                 return 0
 
             # Remove all descendants of parent (recursive deletion)
@@ -508,9 +533,13 @@ Examples:
         nodes_skipped = 0
 
         if args.dry_run:
-            print(f"Would merge {source_tree.node_count} nodes from {args.merge_database}")
+            print(
+                f"Would merge {source_tree.node_count} nodes from {args.merge_database}"
+            )
             if parent_node:
-                print(f"Would attach to parent: {parent_node.name} (ID: {parent_node.tax_id})")
+                print(
+                    f"Would attach to parent: {parent_node.name} (ID: {parent_node.tax_id})"
+                )
             return 0
 
         # Create ID mapping to avoid conflicts
@@ -560,17 +589,21 @@ Examples:
             new_parent_id = None
 
             if source_node.parent_id is not None:
-                new_parent_id = id_mapping.get(source_node.parent_id, source_node.parent_id)
+                new_parent_id = id_mapping.get(
+                    source_node.parent_id, source_node.parent_id
+                )
 
             if new_id == new_parent_id:
-                self.logger.error(f"CIRCULAR REFERENCE: {source_node.name} would be its own parent (id={new_id})")
+                self.logger.error(
+                    f"CIRCULAR REFERENCE: {source_node.name} would be its own parent (id={new_id})"
+                )
                 continue
 
             new_node = TaxonomyNode(
                 tax_id=new_id,
                 name=source_node.name,
                 rank=source_node.rank,
-                parent_id=new_parent_id
+                parent_id=new_parent_id,
             )
 
             try:

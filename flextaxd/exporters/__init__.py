@@ -25,14 +25,14 @@ from .malt_mapdb import MALTMapDBExporter
 from .kmcp import KMCPExporter
 
 __all__ = [
-    "TaxonomyExporter", 
-    "NCBIExporter", 
-    "Kraken2Exporter", 
-    "GanonExporter", 
+    "TaxonomyExporter",
+    "NCBIExporter",
+    "Kraken2Exporter",
+    "GanonExporter",
     "Ganon2Exporter",
     "CentrifugeExporter",
     "DiamondExporter",
-    "KaijuExporter", 
+    "KaijuExporter",
     "MALTExporter",
     "MelonExporter",
     "SourmashExporter",
@@ -42,9 +42,9 @@ __all__ = [
     "MMseqs2Exporter",
     # CreateTaxDB formats
     "Accession2TaxidExporter",
-    "Nucl2TaxidExporter", 
+    "Nucl2TaxidExporter",
     "Prot2TaxidExporter",
     "GenomeSizesExporter",
     "MALTMapDBExporter",
-    "KMCPExporter"
+    "KMCPExporter",
 ]

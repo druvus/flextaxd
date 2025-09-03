@@ -10,12 +10,12 @@ from .silva import SILVATaxonomyParser
 from .cansnper import CanSNPerTaxonomyParser
 
 __all__ = [
-    "TaxonomyParser", 
+    "TaxonomyParser",
     "ParserRegistry",
     "TSVTaxonomyParser",
-    "NCBITaxonomyParser", 
+    "NCBITaxonomyParser",
     "QIIMETaxonomyParser",
     "GTDBTaxonomyParser",
     "SILVATaxonomyParser",
-    "CanSNPerTaxonomyParser"
+    "CanSNPerTaxonomyParser",
 ]
