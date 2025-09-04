@@ -4,6 +4,7 @@ from typing import Optional, Dict, Any, Set
 from pathlib import Path
 
 from .base import DirectoryBasedExporter
+from .validation import require_export_validation
 from ..core.models import TaxonomyTree
 from ..core.exceptions import ExportError
 from ..utils.logging_config import get_logger
@@ -22,6 +23,7 @@ class Kraken2Exporter(DirectoryBasedExporter):
     def file_extensions(self) -> list[str]:
         return [".dmp", ".map"]
 
+    @require_export_validation("kraken2")
     def export(self, tree: TaxonomyTree, output_path: Path, **kwargs: Any) -> None:
         """Export taxonomy tree in Kraken2 format.
 

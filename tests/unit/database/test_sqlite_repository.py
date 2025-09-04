@@ -673,6 +673,176 @@ class TestSQLiteTaxonomyRepository:
             if db_path.exists():
                 db_path.unlink()
 
+    def test_enhanced_genome_statistics_no_genomes(self):
+        """Test enhanced genome statistics with no genomes."""
+        with tempfile.NamedTemporaryFile(suffix=".ftd", delete=False) as f:
+            db_path = Path(f.name)
+
+        db_path.unlink()
+
+        try:
+            with SQLiteTaxonomyRepository(db_path) as repo:
+                # Add just nodes, no genomes
+                root = TaxonomyNode(tax_id=1, name="root", rank=TaxonomicRank.CUSTOM)
+                repo.add_node(root)
+
+                stats = repo.get_statistics()
+
+                assert stats["node_count"] == 1
+                assert stats["genome_count"] == 0
+                
+                # Enhanced genome stats should not be present when no genomes
+                assert "genomes_with_files" not in stats
+                assert "genomes_metadata_only" not in stats
+                assert "genome_size_distribution" not in stats
+                assert "sequence_type_breakdown" not in stats
+                assert "source_distribution" not in stats
+        finally:
+            if db_path.exists():
+                db_path.unlink()
+
+    def test_enhanced_genome_statistics_with_files(self):
+        """Test enhanced genome statistics with genome files."""
+        with tempfile.NamedTemporaryFile(suffix=".ftd", delete=False) as f:
+            db_path = Path(f.name)
+
+        db_path.unlink()
+
+        # Create temporary test files
+        test_files = []
+        for i in range(3):
+            temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False)
+            temp_file.write(f">seq{i}\nATCGATCG\n")
+            temp_file.close()
+            test_files.append(Path(temp_file.name))
+
+        try:
+            with SQLiteTaxonomyRepository(db_path) as repo:
+                # Add nodes
+                root = TaxonomyNode(tax_id=1, name="root", rank=TaxonomicRank.CUSTOM)
+                bacteria = TaxonomyNode(tax_id=2, name="Bacteria", rank=TaxonomicRank.SUPERKINGDOM, parent_id=1)
+                ecoli = TaxonomyNode(tax_id=562, name="E. coli", rank=TaxonomicRank.SPECIES, parent_id=2)
+                
+                for node in [root, bacteria, ecoli]:
+                    repo.add_node(node)
+
+                # Add genomes with different scenarios
+                genomes = [
+                    GenomeInfo(
+                        genome_id="NC_000913",
+                        tax_id=562,
+                        file_path=str(test_files[0]),  # Existing file
+                        sequence_length=4641652,
+                        sequence_type="genome",
+                        assembly_accession="GCF_000005825.2",
+                        source="NCBI"
+                    ),
+                    GenomeInfo(
+                        genome_id="NC_003197", 
+                        tax_id=562,
+                        file_path="/nonexistent/path.fasta",  # Missing file
+                        sequence_length=4857432,
+                        sequence_type="genome",
+                        source="NCBI"
+                    ),
+                    GenomeInfo(
+                        genome_id="metadata_only",
+                        tax_id=562,
+                        file_path=None,  # No file path
+                        sequence_length=None,
+                        sequence_type="16S",
+                        assembly_accession="GCA_123456789.1",
+                        source="GTDB"
+                    ),
+                ]
+
+                for genome in genomes:
+                    repo.add_genome(genome)
+
+                # Test with file validation
+                stats = repo.get_statistics(validate_files=True)
+
+                assert stats["node_count"] == 3
+                assert stats["genome_count"] == 3
+                assert stats["genomes_with_files"] == 2
+                assert stats["genomes_metadata_only"] == 1
+
+                # File validation results
+                validation = stats["genome_file_validation"]
+                assert validation["accessible"] == 1  # test_files[0]
+                assert validation["missing"] == 1     # /nonexistent/path.fasta
+                assert validation["invalid"] == 0
+
+                # Genome size distribution
+                size_dist = stats["genome_size_distribution"]
+                assert size_dist["count"] == 2  # Two genomes have size data
+                assert size_dist["min"] == 4641652
+                assert size_dist["max"] == 4857432
+                assert size_dist["avg"] == (4641652 + 4857432) / 2
+
+                # Sequence type breakdown
+                seq_types = stats["sequence_type_breakdown"]
+                assert seq_types["genome"] == 2
+                assert seq_types["16S"] == 1
+
+                # Source distribution
+                sources = stats["source_distribution"]
+                assert sources["NCBI"] == 2
+                assert sources["GTDB"] == 1
+
+        finally:
+            # Cleanup
+            if db_path.exists():
+                db_path.unlink()
+            for temp_file in test_files:
+                if temp_file.exists():
+                    temp_file.unlink()
+
+    def test_enhanced_genome_statistics_skip_validation(self):
+        """Test enhanced genome statistics without file validation."""
+        with tempfile.NamedTemporaryFile(suffix=".ftd", delete=False) as f:
+            db_path = Path(f.name)
+
+        db_path.unlink()
+
+        try:
+            with SQLiteTaxonomyRepository(db_path) as repo:
+                # Add nodes and genomes
+                root = TaxonomyNode(tax_id=1, name="root", rank=TaxonomicRank.CUSTOM)
+                bacteria = TaxonomyNode(tax_id=2, name="Bacteria", rank=TaxonomicRank.SUPERKINGDOM, parent_id=1)
+                
+                for node in [root, bacteria]:
+                    repo.add_node(node)
+
+                genome = GenomeInfo(
+                    genome_id="test_genome",
+                    tax_id=2,
+                    file_path="/some/path.fasta",
+                    sequence_length=1000000,
+                    sequence_type="genome",
+                    source="TEST"
+                )
+                repo.add_genome(genome)
+
+                # Test without file validation
+                stats = repo.get_statistics(validate_files=False)
+
+                assert stats["genome_count"] == 1
+                assert stats["genomes_with_files"] == 1
+                assert stats["genomes_metadata_only"] == 0
+                
+                # File validation should not be present
+                assert "genome_file_validation" not in stats
+                
+                # Other stats should still be present
+                assert "genome_size_distribution" in stats
+                assert "sequence_type_breakdown" in stats
+                assert "source_distribution" in stats
+
+        finally:
+            if db_path.exists():
+                db_path.unlink()
+
     def test_transaction_rollback_on_error(self):
         """Test transaction rollback on error."""
         with tempfile.NamedTemporaryFile(suffix=".ftd", delete=False) as f:

@@ -9,6 +9,7 @@ from ...core.exceptions import ValidationError, DatabaseError, ExportError
 from ...core.models import TaxonomyTree
 from ...database.sqlite import SQLiteTaxonomyRepository
 from ...exporters.base import TaxonomyExporter
+from ...exporters.validation import validate_export_requirements
 
 
 class ExportCommand(BaseCommand):
@@ -156,6 +157,19 @@ Examples:
             "--compress", action="store_true", help="Compress output files with gzip"
         )
 
+        parser.add_argument(
+            "--validate-files",
+            action="store_true",
+            default=True,
+            help="Validate genome file paths exist before export (default: True)",
+        )
+
+        parser.add_argument(
+            "--skip-validation",
+            action="store_true",
+            help="Skip export validation checks (not recommended)",
+        )
+
         # NCBI-specific options
         ncbi_group = parser.add_argument_group("NCBI format options")
         ncbi_group.add_argument(
@@ -292,6 +306,33 @@ Examples:
                 tree = repository.load_tree()
 
                 self.logger.info(f"Loaded tree with {tree.node_count} nodes")
+
+                # Validate export requirements (unless skipped)
+                if not args.skip_validation:
+                    validation_result = validate_export_requirements(
+                        export_type, 
+                        tree, 
+                        validate_files=args.validate_files
+                    )
+                    
+                    # Handle validation results
+                    if not validation_result.passed:
+                        self.logger.error(f"Export validation failed for {export_type}")
+                        for failure in validation_result.requirements_failed:
+                            print(f"❌ Requirement failed: {failure}")
+                        raise ValidationError(f"Export requirements not met for {export_type} format")
+                    
+                    # Show validation results
+                    if validation_result.requirements_met:
+                        for requirement in validation_result.requirements_met:
+                            self.logger.info(f"✓ {requirement}")
+                    
+                    # Show warnings
+                    for warning in validation_result.warnings:
+                        self.logger.warning(warning)
+                        print(f"⚠️  Warning: {warning}")
+                else:
+                    self.logger.info(f"Export validation skipped for {export_type}")
 
                 # Route to appropriate export method
                 if export_type in classifier_formats or export_type in [

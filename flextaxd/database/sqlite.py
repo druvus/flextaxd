@@ -536,8 +536,12 @@ class SQLiteTaxonomyRepository(TaxonomyRepository):
         except sqlite3.Error as e:
             raise DatabaseError(f"Failed to get genomes for node {tax_id}: {e}")
 
-    def get_statistics(self) -> Dict[str, Any]:
-        """Get repository statistics."""
+    def get_statistics(self, validate_files: bool = True) -> Dict[str, Any]:
+        """Get repository statistics with enhanced genome analysis.
+        
+        Args:
+            validate_files: Whether to perform filesystem validation (can be slow for large datasets)
+        """
         conn = self._get_connection()
 
         try:
@@ -547,9 +551,13 @@ class SQLiteTaxonomyRepository(TaxonomyRepository):
             cursor = conn.execute("SELECT COUNT(*) FROM nodes")
             stats["node_count"] = cursor.fetchone()[0]
 
-            # Genome count
+            # Basic genome count
             cursor = conn.execute("SELECT COUNT(*) FROM genomes")
             stats["genome_count"] = cursor.fetchone()[0]
+
+            # Enhanced genome statistics
+            if stats["genome_count"] > 0:
+                stats.update(self._get_detailed_genome_statistics(conn, validate_files))
 
             # Rank distribution
             cursor = conn.execute(
@@ -590,6 +598,99 @@ class SQLiteTaxonomyRepository(TaxonomyRepository):
 
         except sqlite3.Error as e:
             raise DatabaseError(f"Failed to get statistics: {e}")
+
+    def _get_detailed_genome_statistics(self, conn: sqlite3.Connection, validate_files: bool) -> Dict[str, Any]:
+        """Get detailed genome statistics including file validation and breakdowns."""
+        from pathlib import Path
+        
+        genome_stats = {}
+        
+        # Get all genome data for analysis
+        cursor = conn.execute(
+            """
+            SELECT genome_id, file_path, sequence_length, sequence_type, source 
+            FROM genomes
+            """
+        )
+        genomes = cursor.fetchall()
+        
+        # File path analysis
+        genomes_with_files = 0
+        genomes_metadata_only = 0
+        file_validation = {"accessible": 0, "missing": 0, "invalid": 0}
+        
+        # Size analysis
+        sequence_lengths = []
+        
+        # Type and source breakdowns
+        sequence_types = {}
+        sources = {}
+        
+        for genome_id, file_path, seq_length, seq_type, source in genomes:
+            # File path analysis
+            has_file_path = file_path and file_path.strip()
+            
+            if has_file_path:
+                genomes_with_files += 1
+                
+                # File validation (if requested)
+                if validate_files:
+                    try:
+                        path = Path(file_path)
+                        if path.exists():
+                            if path.is_file() and path.stat().st_size > 0:
+                                file_validation["accessible"] += 1
+                            else:
+                                file_validation["invalid"] += 1
+                        else:
+                            file_validation["missing"] += 1
+                    except (OSError, PermissionError):
+                        file_validation["invalid"] += 1
+            else:
+                genomes_metadata_only += 1
+            
+            # Sequence length analysis
+            if seq_length is not None and seq_length > 0:
+                sequence_lengths.append(seq_length)
+            
+            # Sequence type breakdown
+            type_key = seq_type or "unknown"
+            sequence_types[type_key] = sequence_types.get(type_key, 0) + 1
+            
+            # Source breakdown  
+            source_key = source or "unknown"
+            sources[source_key] = sources.get(source_key, 0) + 1
+        
+        # Compile results
+        genome_stats["genomes_with_files"] = genomes_with_files
+        genome_stats["genomes_metadata_only"] = genomes_metadata_only
+        
+        if validate_files:
+            genome_stats["genome_file_validation"] = file_validation
+        
+        # Genome size distribution
+        if sequence_lengths:
+            genome_stats["genome_size_distribution"] = {
+                "count": len(sequence_lengths),
+                "min": min(sequence_lengths),
+                "max": max(sequence_lengths),
+                "avg": sum(sequence_lengths) / len(sequence_lengths),
+                "median": sorted(sequence_lengths)[len(sequence_lengths) // 2]
+            }
+        else:
+            genome_stats["genome_size_distribution"] = {
+                "count": 0,
+                "min": 0,
+                "max": 0,
+                "avg": 0.0,
+                "median": 0
+            }
+        
+        # Breakdowns
+        genome_stats["sequence_type_breakdown"] = sequence_types
+        genome_stats["source_distribution"] = sources
+        
+        return genome_stats
 
     @contextmanager
     def transaction(self) -> Generator[sqlite3.Connection, None, None]:

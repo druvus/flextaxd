@@ -22,6 +22,7 @@ from pathlib import Path
 import re
 
 from .base import DirectoryBasedExporter
+from .validation import require_export_validation
 from ..core.models import TaxonomyTree, TaxonomicRank
 from ..core.exceptions import ExportError, ValidationError
 from ..utils.logging_config import get_logger
@@ -61,6 +62,7 @@ class DiamondExporter(DirectoryBasedExporter):
     def file_extensions(self) -> list[str]:
         return [".fasta", ".fa", ".txt"]
 
+    @require_export_validation("diamond", validate_files=True)
     def export(self, tree: TaxonomyTree, output_path: Path, **kwargs: Any) -> None:
         """Export taxonomy tree for Diamond database creation.
 

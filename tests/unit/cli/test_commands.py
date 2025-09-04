@@ -425,11 +425,126 @@ class TestStatsCommand(TestCommandsBase):
                 database=str(db_file),
                 detailed=True,
                 format="text",
-                verbose=False
+                verbose=False,
+                validate_files=True,
+                skip_file_validation=False
             )
             
             result = command.execute(args)
             assert result == 0
+
+    @patch('flextaxd.cli.commands.stats.SQLiteTaxonomyRepository')
+    @patch('flextaxd.cli.commands.stats.StatsCommand._validate_database_path')
+    def test_enhanced_genome_stats(self, mock_validate_db, mock_repo):
+        """Test enhanced genome statistics display."""
+        
+        mock_repository = Mock()
+        mock_repository.get_statistics.return_value = {
+            'node_count': 3,
+            'genome_count': 5,
+            'genomes_with_files': 3,
+            'genomes_metadata_only': 2,
+            'genome_file_validation': {
+                'accessible': 2,
+                'missing': 1,
+                'invalid': 0
+            },
+            'genome_size_distribution': {
+                'count': 4,
+                'min': 1000000,
+                'max': 5000000,
+                'avg': 3000000.0,
+                'median': 3200000
+            },
+            'sequence_type_breakdown': {
+                'genome': 3,
+                '16S': 1,
+                'plasmid': 1
+            },
+            'source_distribution': {
+                'NCBI': 3,
+                'GTDB': 1,
+                'SILVA': 1
+            },
+            'rank_distribution': {
+                TaxonomicRank.ROOT: 1,
+                TaxonomicRank.SUPERKINGDOM: 1,
+                TaxonomicRank.SPECIES: 1
+            },
+            'root_nodes': [1],
+            'leaf_nodes': [3]
+        }
+        mock_repo.return_value = mock_repository
+        mock_repository.__enter__ = Mock(return_value=mock_repository)
+        mock_repository.__exit__ = Mock(return_value=None)
+        
+        command = StatsCommand()
+        
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_file = Path(tmp_dir) / "test.ftd"
+            
+            args = Namespace(
+                database=str(db_file),
+                detailed=False,
+                format="text",
+                verbose=False,
+                validate_files=True,
+                skip_file_validation=False
+            )
+            
+            result = command.execute(args)
+            assert result == 0
+            
+            # Verify get_statistics was called with correct parameters
+            mock_repository.get_statistics.assert_called_once_with(validate_files=True)
+
+    @patch('flextaxd.cli.commands.stats.SQLiteTaxonomyRepository')  
+    @patch('flextaxd.cli.commands.stats.StatsCommand._validate_database_path')
+    def test_skip_file_validation(self, mock_validate_db, mock_repo):
+        """Test skipping file validation for faster stats."""
+        
+        mock_repository = Mock()
+        mock_repository.get_statistics.return_value = {
+            'node_count': 2,
+            'genome_count': 1,
+            'genomes_with_files': 1,
+            'genomes_metadata_only': 0,
+            'genome_size_distribution': {
+                'count': 1,
+                'min': 1000000,
+                'max': 1000000,  
+                'avg': 1000000.0,
+                'median': 1000000
+            },
+            'sequence_type_breakdown': {'genome': 1},
+            'source_distribution': {'NCBI': 1},
+            'rank_distribution': {TaxonomicRank.ROOT: 1, TaxonomicRank.SPECIES: 1},
+            'root_nodes': [1],
+            'leaf_nodes': [2]
+        }
+        mock_repo.return_value = mock_repository
+        mock_repository.__enter__ = Mock(return_value=mock_repository)
+        mock_repository.__exit__ = Mock(return_value=None)
+        
+        command = StatsCommand()
+        
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_file = Path(tmp_dir) / "test.ftd"
+            
+            args = Namespace(
+                database=str(db_file),
+                detailed=False,
+                format="text",
+                verbose=False,
+                validate_files=True,
+                skip_file_validation=True  # This should override validate_files
+            )
+            
+            result = command.execute(args)
+            assert result == 0
+            
+            # Verify get_statistics was called with validate_files=False
+            mock_repository.get_statistics.assert_called_once_with(validate_files=False)
 
 
 class TestVisualizeCommand(TestCommandsBase):

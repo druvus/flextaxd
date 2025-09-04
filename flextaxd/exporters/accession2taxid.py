@@ -4,6 +4,7 @@ from typing import Optional, Dict, Any, Callable, IO
 from pathlib import Path
 
 from .base import FileBasedExporter
+from .validation import require_export_validation
 from ..core.models import TaxonomyTree
 from ..core.exceptions import ExportError
 from ..utils.logging_config import get_logger
@@ -26,6 +27,7 @@ class Accession2TaxidExporter(FileBasedExporter):
     def file_extensions(self) -> list[str]:
         return [".txt", ".tsv", ".gz"]
 
+    @require_export_validation("accession2taxid")
     def export(self, tree: TaxonomyTree, output_path: Path, **kwargs: Any) -> None:
         """Export taxonomy tree in Accession2Taxid format.
 
