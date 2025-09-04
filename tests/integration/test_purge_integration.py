@@ -126,14 +126,16 @@ class TestPurgeIntegration:
             result = tree.purge_nodes_without_genomes(require_fasta_files=False)
             
             # Should keep all nodes with genomes (including metadata-only)
-            # Only empty branches should be removed
-            assert result["nodes_removed"] == 1  # Only Animalia(7) has no genomes at all
-            assert result["nodes_after"] == 10
+            # All lineages to genome nodes must be preserved, so no nodes removed
+            assert result["nodes_removed"] == 0  # All lineages to genome nodes preserved
+            assert result["nodes_after"] == 11   # All original nodes kept
             assert result["genomes_retained"] == 6  # All genomes
             
-            # Animalia should be removed but Homo sapiens should remain (has metadata)
-            assert 7 not in tree._nodes  # Animalia removed
-            assert 11 in tree._nodes     # Homo sapiens kept
+            # All nodes should remain because they're either:
+            # 1. Have genomes themselves: 8(E.coli), 9(Salmonella), 10(M.smithii), 11(Homo)
+            # 2. Are in lineage paths to genome nodes: 1,2,3,4,5,6,7
+            assert 7 in tree._nodes   # Animalia kept (in path to Homo sapiens)
+            assert 11 in tree._nodes  # Homo sapiens kept (has metadata genome)
 
     def test_purge_cli_integration_dry_run(self):
         """Test purge CLI command in dry run mode."""
