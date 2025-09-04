@@ -269,6 +269,9 @@ class HighPerformanceTaxonomyTree:
 
         print(f"Loaded {total_loaded:,} nodes total")
 
+        # Build indexes after all nodes are loaded
+        self._build_indexes()
+        
         # Preprocess for fast LCA queries
         self._preprocess_lca()
         self._stats["nodes_loaded"] = total_loaded
@@ -278,6 +281,7 @@ class HighPerformanceTaxonomyTree:
     ) -> None:
         """Process a batch of nodes efficiently."""
         with self._lock:
+            # First pass: create all nodes
             for tax_id, name, rank, parent_id in batch:
                 # Intern strings
                 name_id = self.string_pool.intern(name)
@@ -302,10 +306,52 @@ class HighPerformanceTaxonomyTree:
 
                 self._nodes[tax_id] = node
 
-                # Build indexes
-                if parent_id is not None:
-                    self._children_index[parent_id].append(tax_id)
-                    self._parent_index[tax_id] = parent_id
+    def _build_indexes(self) -> None:
+        """Build parent/child indexes after all nodes are loaded."""
+        with self._lock:
+            # Clear existing indexes
+            self._children_index.clear()
+            self._parent_index.clear()
+            
+            # Find root node(s)
+            root_nodes = [tax_id for tax_id, node in self._nodes.items() if node.parent_id is None]
+            
+            if not root_nodes:
+                raise ValidationError("No root node found")
+            
+            # Use the first root as the main root
+            main_root = root_nodes[0]
+            
+            # Build indexes, handling orphaned nodes
+            orphaned_nodes = []
+            
+            for tax_id, node in self._nodes.items():
+                if node.parent_id is not None:
+                    # Check if parent actually exists
+                    if node.parent_id in self._nodes:
+                        self._children_index[node.parent_id].append(tax_id)
+                        self._parent_index[tax_id] = node.parent_id
+                    else:
+                        # Parent doesn't exist - this is an orphaned node
+                        orphaned_nodes.append(tax_id)
+                        
+            # Connect orphaned nodes to the main root to maintain tree connectivity
+            if orphaned_nodes:
+                print(f"Warning: Found {len(orphaned_nodes)} orphaned nodes, connecting to root {main_root}")
+                for orphan_id in orphaned_nodes:
+                    # Update the node's parent_id to point to root
+                    orphan_node = self._nodes[orphan_id]
+                    updated_node = CompressedNode(
+                        tax_id=orphan_node.tax_id,
+                        parent_id=main_root,
+                        rank_id=orphan_node.rank_id,
+                        name_id=orphan_node.name_id
+                    )
+                    self._nodes[orphan_id] = updated_node
+                    
+                    # Add to indexes
+                    self._children_index[main_root].append(orphan_id)
+                    self._parent_index[orphan_id] = main_root
 
     def _preprocess_lca(self) -> None:
         """Preprocess tree for O(1) LCA queries using RMQ."""
