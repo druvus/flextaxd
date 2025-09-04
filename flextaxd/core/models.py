@@ -770,6 +770,10 @@ class TaxonomyTree:
         eligible_genomes = []
         
         for genome in self._genomes.values():
+            # Skip genomes that point to non-existent nodes
+            if genome.tax_id not in self._nodes:
+                continue
+                
             # Check if genome meets the criteria
             has_file = genome.file_path is not None and str(genome.file_path).strip() != ""
             
@@ -848,10 +852,10 @@ class TaxonomyTree:
                     # Node might already be removed or have issues
                     continue
         
-        # Step 5: Clean up genomes that belong to removed nodes
+        # Step 5: Clean up genomes that belong to removed nodes or point to non-existent nodes
         remaining_genomes = {}
         for genome_id, genome in self._genomes.items():
-            if genome.tax_id in essential_nodes:
+            if genome.tax_id in essential_nodes and genome.tax_id in self._nodes:
                 remaining_genomes[genome_id] = genome
         
         self._genomes = remaining_genomes
