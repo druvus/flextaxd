@@ -14,6 +14,7 @@ from .commands import (
     ExportCommand,
     StatsCommand,
     VisualizeCommand,
+    PurgeCommand,
 )
 from .commands.base import BaseCommand
 
@@ -31,6 +32,7 @@ Examples:
   flextaxd stats --database my_db.ftd
   flextaxd visualize --database my_db.ftd --type tree --max-depth 3
   flextaxd modify --database my_db.ftd --add-node "New Species" --parent-id 12345
+  flextaxd purge --database my_db.ftd --backup my_db_backup.ftd
 
 For more help on a specific command, use:
   flextaxd COMMAND --help
@@ -65,6 +67,7 @@ For more help on a specific command, use:
     ExportCommand.register_parser(subparsers)
     StatsCommand.register_parser(subparsers)
     VisualizeCommand.register_parser(subparsers)
+    PurgeCommand.register_parser(subparsers)
 
     return parser
 
@@ -99,6 +102,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             "export": ExportCommand,
             "stats": StatsCommand,
             "visualize": VisualizeCommand,
+            "purge": PurgeCommand,
         }
 
         command_class = command_classes[args.command]

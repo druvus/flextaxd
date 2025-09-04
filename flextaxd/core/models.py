@@ -737,3 +737,133 @@ class TaxonomyTree:
             )
 
         return stats
+
+    def purge_nodes_without_genomes(self, require_fasta_files: bool = True, force: bool = False) -> Dict[str, Any]:
+        """Remove nodes that don't have genomes with FASTA files, keeping essential lineages.
+        
+        This method implements the purge_database functionality by:
+        1. Identifying all nodes with genomes that have FASTA files (if required)
+        2. Finding all lineages from these nodes to the root
+        3. Removing all other nodes not in these essential lineages
+        
+        Args:
+            require_fasta_files: If True, only keep nodes with genomes that have file_path.
+                                If False, keep nodes with any genome data.
+            force: If True, bypass safety checks that prevent excessive purging.
+        
+        Returns:
+            Dictionary with purge statistics including nodes removed and kept
+        """
+        if not self._nodes:
+            return {
+                "nodes_before": 0,
+                "nodes_after": 0,
+                "nodes_removed": 0,
+                "genomes_retained": 0,
+                "lineages_preserved": 0,
+            }
+        
+        initial_node_count = len(self._nodes)
+        
+        # Step 1: Find all nodes with eligible genomes
+        nodes_with_genomes = set()
+        eligible_genomes = []
+        
+        for genome in self._genomes.values():
+            # Check if genome meets the criteria
+            has_file = genome.file_path is not None and str(genome.file_path).strip() != ""
+            
+            if not require_fasta_files or has_file:
+                nodes_with_genomes.add(genome.tax_id)
+                eligible_genomes.append(genome)
+        
+        if not nodes_with_genomes:
+            # No eligible nodes found - this would remove everything
+            # Return stats without making changes
+            return {
+                "nodes_before": initial_node_count,
+                "nodes_after": initial_node_count,
+                "nodes_removed": 0,
+                "genomes_retained": 0,
+                "lineages_preserved": 0,
+                "warning": "No nodes with eligible genomes found - no changes made"
+            }
+        
+        # Safety check: prevent excessive purging (more than 95% of nodes)
+        temp_essential_nodes = set()
+        for node_id in nodes_with_genomes:
+            path = self.get_path_to_root(node_id)
+            temp_essential_nodes.update([n.tax_id for n in path])
+        
+        potential_removal_count = initial_node_count - len(temp_essential_nodes)
+        if potential_removal_count > 0 and not force:
+            removal_percentage = (potential_removal_count / initial_node_count) * 100
+            if removal_percentage > 95.0:
+                return {
+                    "nodes_before": initial_node_count,
+                    "nodes_after": initial_node_count,
+                    "nodes_removed": 0,
+                    "genomes_retained": len(eligible_genomes),
+                    "lineages_preserved": 0,
+                    "warning": f"Purge would remove {removal_percentage:.1f}% of nodes - operation blocked for safety. Use --force in CLI if intended."
+                }
+        
+        # Step 2: Find all lineages from genome nodes to root
+        essential_nodes = set()
+        lineages_count = 0
+        
+        for node_id in nodes_with_genomes:
+            lineages_count += 1
+            # Get path from node to root
+            path = self.get_path_to_root(node_id)
+            essential_nodes.update([n.tax_id for n in path])
+        
+        # Step 3: Identify nodes to remove
+        all_node_ids = set(self._nodes.keys())
+        nodes_to_remove = all_node_ids - essential_nodes
+        
+        # Step 4: Remove non-essential nodes
+        # Sort nodes by depth (deepest first to avoid parent-child dependency issues)
+        nodes_by_depth = []
+        for node_id in nodes_to_remove:
+            try:
+                path = self.get_path_to_root(node_id)
+                depth = len(path) - 1
+                nodes_by_depth.append((depth, node_id))
+            except:
+                # If path calculation fails, remove this node last
+                nodes_by_depth.append((999, node_id))
+        
+        # Sort by depth in descending order (deepest first)
+        nodes_by_depth.sort(reverse=True)
+        
+        removed_count = 0
+        for depth, node_id in nodes_by_depth:
+            if node_id in self._nodes:  # Node might have been removed as child of another
+                try:
+                    # Remove node and reassign children to parent
+                    self.remove_node(node_id, reassign_children=True)
+                    removed_count += 1
+                except ValueError:
+                    # Node might already be removed or have issues
+                    continue
+        
+        # Step 5: Clean up genomes that belong to removed nodes
+        remaining_genomes = {}
+        for genome_id, genome in self._genomes.items():
+            if genome.tax_id in essential_nodes:
+                remaining_genomes[genome_id] = genome
+        
+        self._genomes = remaining_genomes
+        
+        final_node_count = len(self._nodes)
+        
+        return {
+            "nodes_before": initial_node_count,
+            "nodes_after": final_node_count,
+            "nodes_removed": removed_count,
+            "genomes_retained": len(eligible_genomes),
+            "lineages_preserved": lineages_count,
+            "nodes_with_genomes": len(nodes_with_genomes),
+            "essential_nodes_kept": len(essential_nodes),
+        }

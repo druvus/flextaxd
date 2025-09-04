@@ -6,6 +6,7 @@ from .modify import ModifyCommand
 from .export import ExportCommand
 from .stats import StatsCommand
 from .visualize import VisualizeCommand
+from .purge import PurgeCommand
 
 __all__ = [
     "BaseCommand",
@@ -14,4 +15,5 @@ __all__ = [
     "ExportCommand",
     "StatsCommand",
     "VisualizeCommand",
+    "PurgeCommand",
 ]
