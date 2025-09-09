@@ -77,7 +77,23 @@ class Accession2TaxidExporter(FileBasedExporter):
         compress: bool,
         sequence_type: Optional[str] = None,
     ) -> None:
-        """Write accession2taxid mapping file."""
+        """Write accession2taxid mapping file with optional parallel processing."""
+        # Use parallel processing for large datasets
+        if tree.node_count > 5000 and tree.genome_count > 10000 and self.max_workers > 1:
+            logger.info(f"Using parallel processing for {tree.genome_count} genomes with {self.max_workers} workers")
+            self._write_accession2taxid_file_parallel(tree, output_path, compress, sequence_type)
+        else:
+            logger.info(f"Using sequential processing for {tree.genome_count} genomes")
+            self._write_accession2taxid_file_sequential(tree, output_path, compress, sequence_type)
+
+    def _write_accession2taxid_file_sequential(
+        self,
+        tree: TaxonomyTree,
+        output_path: Path,
+        compress: bool,
+        sequence_type: Optional[str] = None,
+    ) -> None:
+        """Write accession2taxid mapping file sequentially (original method)."""
         open_func = self._get_open_function(output_path, compress)
 
         with open_func(output_path, "wt", encoding="utf-8") as f:
@@ -107,6 +123,55 @@ class Accession2TaxidExporter(FileBasedExporter):
                     entries_written += 1
 
             logger.info(f"Wrote {entries_written} accession mappings")
+
+    def _write_accession2taxid_file_parallel(
+        self,
+        tree: TaxonomyTree,
+        output_path: Path,
+        compress: bool,
+        sequence_type: Optional[str] = None,
+    ) -> None:
+        """Write accession2taxid mapping file using parallel processing."""
+        
+        def process_node_chunk(nodes, chunk_idx):
+            """Process a chunk of nodes to generate accession mappings."""
+            chunk_lines = []
+            for node in nodes:
+                genomes = tree.get_genomes_for_node(node.tax_id)
+                for genome in genomes:
+                    # Apply sequence type filter if specified
+                    if (
+                        sequence_type is not None
+                        and genome.sequence_type != sequence_type
+                    ):
+                        continue
+
+                    # Extract accession from genome ID
+                    accession = self._extract_accession(genome.genome_id)
+                    accession_version = genome.assembly_accession or genome.genome_id
+
+                    # Use 0 as placeholder for GI (GenInfo Identifier) as it's legacy
+                    gi = "0"
+
+                    chunk_lines.append(f"{accession}\t{accession_version}\t{node.tax_id}\t{gi}")
+            return chunk_lines
+
+        # Process tree in parallel chunks
+        all_lines = self._process_tree_chunks(tree, process_node_chunk, 
+                                            chunk_size=1000, description="nodes with genomes")
+
+        # Write results to file
+        open_func = self._get_open_function(output_path, compress)
+        
+        with open_func(output_path, "wt", encoding="utf-8") as f:
+            # Write header
+            f.write("accession\taccession.version\ttaxid\tgi\n")
+            
+            # Write all generated lines
+            for line in all_lines:
+                f.write(line + "\n")
+
+        logger.info(f"Wrote {len(all_lines)} accession mappings using parallel processing")
 
     def _extract_accession(self, genome_id: str) -> str:
         """Extract base accession from genome ID.

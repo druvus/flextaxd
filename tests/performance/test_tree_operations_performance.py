@@ -113,7 +113,8 @@ class TestTreePerformance:
     def test_subtree_extraction_performance(self, large_tree: TaxonomyTree):
         """Benchmark subtree extraction operations."""
         # Extract subtrees at different levels
-        extraction_points = [12, 23, 34, 45, 56]  # Various phylum nodes
+        # Actual phylum node IDs: superkingdoms are 2-11, then phyla start at 3, 14, 25, etc.
+        extraction_points = [3, 14, 25, 36, 47]  # Various phylum nodes (corrected IDs)
 
         start_time = time.time()
 
@@ -187,23 +188,28 @@ class TestTreePerformance:
         """Test memory efficiency of tree operations."""
         import sys
 
-        # Measure memory usage of tree
-        initial_size = sys.getsizeof(large_tree)
+        # Test that subtrees contain appropriate number of nodes
+        original_node_count = large_tree.node_count
+        print(f"Original tree has {original_node_count} nodes")
 
-        # Extract multiple subtrees (should not significantly increase memory)
+        # Extract multiple subtrees from actual phylum nodes
         subtrees = []
-        for i in range(5):
-            subtree = large_tree.extract_subtree(50 + i * 10, preserve_tax_ids=False)
+        phylum_nodes = [3, 14, 25, 36, 47]  # Corrected phylum node IDs
+        for node_id in phylum_nodes:
+            subtree = large_tree.extract_subtree(node_id, preserve_tax_ids=False)
             subtrees.append(subtree)
 
-        # Memory usage should be reasonable
-        total_subtree_size = sum(sys.getsizeof(st) for st in subtrees)
+        # Check node efficiency
+        total_subtree_nodes = sum(st.node_count for st in subtrees)
+        avg_subtree_nodes = total_subtree_nodes / len(subtrees)
 
-        print(f"Original tree size: {initial_size} bytes")
-        print(f"Total subtrees size: {total_subtree_size} bytes")
+        print(f"Total subtree nodes: {total_subtree_nodes}")
+        print(f"Average subtree size: {avg_subtree_nodes:.1f} nodes")
 
-        # Subtrees should be much smaller than original
-        assert total_subtree_size < initial_size
+        # Each subtree should have reasonable size (1 phylum + 10 classes = 11 nodes)
+        assert avg_subtree_nodes == 11, f"Expected 11 nodes per subtree, got {avg_subtree_nodes}"  
+        # Total subtree nodes should be much less than original
+        assert total_subtree_nodes < original_node_count * 0.1, f"Subtrees too large: {total_subtree_nodes} >= {original_node_count * 0.1}"
 
     @pytest.mark.slow
     def test_large_scale_operations(self):

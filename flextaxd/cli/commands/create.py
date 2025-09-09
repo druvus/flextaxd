@@ -21,27 +21,38 @@ class CreateCommand(BaseCommand):
         """Register the create command parser."""
         parser = subparsers.add_parser(
             "create",
-            help="Create a new taxonomy database",
-            description="Create a new taxonomy database from input files",
+            help="Create taxonomy database from various sources",
+            description="Create taxonomy database from various input sources",
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
+  # From local files
   flextaxd create --input taxonomy.tsv --database my_db.ftd
   flextaxd create --input ncbi_dump/ --format ncbi --database ncbi_db.ftd
   flextaxd create --input gtdb_taxonomy.tsv --format gtdb --database gtdb_db.ftd
-  flextaxd create --input silva_taxonomy.txt --format silva --database silva_db.ftd
-  flextaxd create --input cansnper.tree --format cansnper --database cansnper_db.ftd
+  
+  # From NCBI datasets (requires NCBI datasets CLI)
+  flextaxd create --ncbi-datasets "Escherichia coli" --database ecoli.ftd
+  flextaxd create --ncbi-datasets "562" --assembly-level complete --max-genomes 10 --database ecoli_genomes.ftd
+  flextaxd create --ncbi-datasets "Bacteria" --taxonomy-only --database bacteria_taxonomy.ftd
             """,
         )
 
-        # Input options
+        # Input options - mutually exclusive input sources
         input_group = parser.add_argument_group("Input options")
-        input_group.add_argument(
+        input_source = input_group.add_mutually_exclusive_group(required=True)
+        
+        input_source.add_argument(
             "--input",
             "-i",
             type=str,
-            required=True,
             help="Input taxonomy file or directory",
+        )
+        
+        input_source.add_argument(
+            "--ncbi-datasets",
+            type=str,
+            help="Download data from NCBI datasets for specified taxon (e.g., 'Escherichia coli', '562')",
         )
 
         input_group.add_argument(
@@ -50,7 +61,34 @@ Examples:
             type=str,
             choices=["auto", "tsv", "ncbi", "qiime", "gtdb", "silva", "cansnper"],
             default="auto",
-            help="Input format (default: auto-detect)",
+            help="Input format (default: auto-detect, ignored with --ncbi-datasets)",
+        )
+        
+        # NCBI datasets specific options
+        ncbi_group = parser.add_argument_group("NCBI datasets options (used with --ncbi-datasets)")
+        ncbi_group.add_argument(
+            "--assembly-level",
+            choices=["complete", "chromosome", "scaffold", "contig", "all"],
+            default="complete",
+            help="Assembly level filter for genomes (default: complete)",
+        )
+        
+        ncbi_group.add_argument(
+            "--max-genomes",
+            type=int,
+            help="Maximum number of genomes to download",
+        )
+        
+        ncbi_group.add_argument(
+            "--taxonomy-only",
+            action="store_true",
+            help="Download taxonomy data only (no genomes)",
+        )
+        
+        ncbi_group.add_argument(
+            "--ncbi-cache-dir",
+            type=str,
+            help="Directory to cache NCBI downloads (default: ~/.flextaxd/ncbi_cache)",
         )
 
         # Database options
@@ -127,11 +165,6 @@ Examples:
     def execute(self, args: argparse.Namespace) -> int | None:
         """Execute the create command."""
         try:
-            # Validate input path exists (but don't enforce file vs directory yet)
-            input_path = Path(args.input)
-            if not input_path.exists():
-                raise ValidationError(f"Input path does not exist: {args.input}")
-
             # Check if database exists
             db_path = Path(args.database)
             if db_path.exists() and not args.overwrite:
@@ -139,6 +172,19 @@ Examples:
                     f"Database already exists: {args.database}. "
                     "Use --overwrite to replace it."
                 )
+            
+            # Handle NCBI datasets input
+            if args.ncbi_datasets:
+                return self._create_from_ncbi_datasets(args)
+            
+            # Handle regular file input
+            if not args.input:
+                raise ValidationError("Either --input or --ncbi-datasets must be provided")
+            
+            # Validate input path exists (but don't enforce file vs directory yet)
+            input_path = Path(args.input)
+            if not input_path.exists():
+                raise ValidationError(f"Input path does not exist: {args.input}")
 
             # Register all parsers
             from ...parsers import (
@@ -267,6 +313,11 @@ Examples:
         except ParseError as e:
             self.logger.error(f"Parse error: {e.message}")
             print(f"Parse error: {e.message}")
+            return 1
+        
+        except Exception as e:
+            self.logger.error(f"Unexpected error: {e}")
+            print(f"Error: {e}")
             return 1
 
     def _process_genome_integration(
@@ -409,3 +460,78 @@ Examples:
                 self.logger.warning(f"Could not process genome file {file_path}: {e}")
 
         self.logger.info(f"Auto-detected {sequences_detected} sequence associations")
+
+    def _create_from_ncbi_datasets(self, args: argparse.Namespace) -> int:
+        """Create database from NCBI datasets."""
+        from ...utils.ncbi_datasets import NCBIDatasetsManager, NCBIDatasetsError
+        import tempfile
+        
+        self.logger.info(f"Creating database from NCBI datasets for taxon: {args.ncbi_datasets}")
+        
+        try:
+            # Initialize NCBI datasets manager
+            cache_dir = Path(args.ncbi_cache_dir) if args.ncbi_cache_dir else None
+            manager = NCBIDatasetsManager(cache_dir=cache_dir)
+            
+            # Create temporary directory for downloads
+            with tempfile.TemporaryDirectory() as temp_dir:
+                temp_path = Path(temp_dir)
+                
+                self.logger.info(f"Downloading NCBI data to: {temp_path}")
+                
+                # Download data based on options
+                if args.taxonomy_only:
+                    dataset_info = manager.download_taxonomy(
+                        taxon=args.ncbi_datasets,
+                        output_dir=temp_path,
+                        include_children=True
+                    )
+                else:
+                    download_kwargs = {}
+                    dataset_info = manager.download_genomes(
+                        taxon=args.ncbi_datasets,
+                        output_dir=temp_path,
+                        assembly_level=args.assembly_level,
+                        max_genomes=args.max_genomes,
+                        **download_kwargs
+                    )
+                
+                self.logger.info(f"Downloaded {dataset_info.genome_count} genomes")
+                
+                # Create database
+                db_path = Path(args.database)
+                if db_path.exists():
+                    db_path.unlink()  # Remove existing database if overwrite
+                
+                include_genomes = not args.taxonomy_only and dataset_info.genomes_directory is not None
+                
+                stats = manager.create_flextaxd_database(
+                    dataset_info=dataset_info,
+                    database_path=db_path,
+                    include_genomes=include_genomes
+                )
+                
+                # Print statistics  
+                self.logger.info("Database created successfully from NCBI datasets")
+                print(f"Created database: {args.database}")
+                print(f"  Taxon: {args.ncbi_datasets}")
+                print(f"  Nodes: {stats['node_count']}")
+                print(f"  Genomes: {stats['genome_count']}")
+                
+                if "root_count" in stats:
+                    print(f"  Root nodes: {stats['root_count']}")
+                if "leaf_count" in stats:
+                    print(f"  Leaf nodes: {stats['leaf_count']}")
+
+                if stats["rank_distribution"]:
+                    print("  Rank distribution:")
+                    for rank, count in stats["rank_distribution"].items():
+                        rank_name = rank.value if hasattr(rank, 'value') else str(rank)
+                        print(f"    {rank_name}: {count}")
+                
+                return 0
+                
+        except NCBIDatasetsError as e:
+            self.logger.error(f"NCBI datasets error: {e}")
+            print(f"NCBI datasets error: {e}")
+            return 1

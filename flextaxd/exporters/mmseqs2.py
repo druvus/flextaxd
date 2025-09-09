@@ -402,7 +402,13 @@ class MMseqs2Exporter(DirectoryBasedExporter):
         if sequence_type == "all":
             return True
 
-        genome_type = getattr(genome, "sequence_type", "").lower()
+        # Handle None genome objects
+        if genome is None:
+            return False
+        
+        # Get sequence_type and handle None values
+        sequence_type_attr = getattr(genome, "sequence_type", None)
+        genome_type = (sequence_type_attr or "").lower()
 
         if sequence_type == "protein":
             return genome_type in ["protein", "cds"]

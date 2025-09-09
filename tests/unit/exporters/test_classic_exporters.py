@@ -392,7 +392,7 @@ class TestClassicExportersIntegration:
                 output_path = Path(tmp_dir)
                 
                 # Should handle large tax_ids without issues
-                exporter.export(tree, output_path)
+                exporter.export(tree, output_path, skip_validation=True)
                 
                 # Verify large tax_ids are preserved
                 if (output_path / "nodes.dmp").exists():

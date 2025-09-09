@@ -3,11 +3,19 @@
 import argparse
 from pathlib import Path
 from typing import Optional, Dict, List, Set, Tuple
+import logging
 
 from .base import BaseCommand
 from ...core.exceptions import ValidationError, DatabaseError
 from ...core.models import TaxonomyTree, TaxonomyNode, TaxonomicRank
 from ...database.sqlite import SQLiteTaxonomyRepository
+from ...utils.progress import (
+    progress_manager, 
+    create_console_reporter, 
+    create_logging_reporter,
+    create_silent_reporter,
+    MultiProgressReporter
+)
 
 
 class ImportTreeCommand(BaseCommand):
@@ -119,29 +127,132 @@ Examples:
             help="Create backup before major changes (default: True)"
         )
 
+        # Progress reporting options
+        progress_group = parser.add_argument_group("Progress reporting options")
+        progress_group.add_argument(
+            "--quiet", "-q", action="store_true",
+            help="Suppress progress bars and non-essential output"
+        )
+        
+        progress_group.add_argument(
+            "--progress-log", type=str, metavar="FILE",
+            help="Write progress information to log file"
+        )
+        
+        progress_group.add_argument(
+            "--progress-interval", type=int, default=500, metavar="N",
+            help="Progress update interval for large operations (default: 500)"
+        )
+        
+        progress_group.add_argument(
+            "--no-eta", action="store_true",
+            help="Don't show estimated time remaining in progress bars"
+        )
+        
+        progress_group.add_argument(
+            "--no-rate", action="store_true",
+            help="Don't show processing rate in progress bars"
+        )
+        
+        progress_group.add_argument(
+            "--progress-width", type=int, default=50, metavar="N",
+            help="Width of progress bar (default: 50)"
+        )
+
         return parser
+
+    def _setup_progress_reporting(self, args: argparse.Namespace) -> None:
+        """Setup the progress reporting system based on command arguments."""
+        reporters = []
+        
+        # Console reporter (unless quiet)
+        if not args.quiet:
+            console_reporter = create_console_reporter(
+                width=args.progress_width,
+                show_eta=not args.no_eta,
+                show_rate=not args.no_rate
+            )
+            reporters.append(console_reporter)
+        
+        # Logging reporter (if progress log specified)
+        if hasattr(args, 'progress_log') and args.progress_log:
+            # Setup file logger
+            log_handler = logging.FileHandler(args.progress_log)
+            log_formatter = logging.Formatter(
+                '%(asctime)s - %(levelname)s - %(message)s'
+            )
+            log_handler.setFormatter(log_formatter)
+            
+            progress_logger = logging.getLogger('flextaxd.import_tree.progress')
+            progress_logger.addHandler(log_handler)
+            progress_logger.setLevel(logging.INFO)
+            
+            logging_reporter = create_logging_reporter(
+                progress_logger, 
+                args.progress_interval
+            )
+            reporters.append(logging_reporter)
+        
+        # If no reporters, use silent reporter
+        if not reporters:
+            reporters.append(create_silent_reporter())
+        
+        # Set up the progress manager
+        if len(reporters) == 1:
+            progress_manager.set_default_reporter(reporters[0])
+        else:
+            multi_reporter = MultiProgressReporter(reporters)
+            progress_manager.set_default_reporter(multi_reporter)
 
     def execute(self, args: argparse.Namespace) -> Optional[int]:
         """Execute the import-tree command."""
         try:
-            # Validate inputs
-            self._validate_database_path(args.database, must_exist=True)
-            self._validate_input_file(args.input)
-            self._validate_strategy_requirements(args)
-
-            # Load input tree
-            input_tree = self._load_input_tree(args.input, args.format)
-            self.logger.info(f"Loaded input tree with {input_tree.node_count} nodes")
+            # Setup progress reporting system
+            self._setup_progress_reporting(args)
             
+            # Step 1: Validation and setup with progress
+            with progress_manager.operation(
+                total=5,
+                description="Preparing tree import"
+            ) as progress:
+                
+                progress.update(1, "Validating database path")
+                self._validate_database_path(args.database, must_exist=True)
+                
+                progress.update(2, "Validating input file")
+                self._validate_input_file(args.input)
+                
+                progress.update(3, "Validating strategy requirements")
+                self._validate_strategy_requirements(args)
+                
+                progress.update(4, "Loading input tree")
+                input_tree = self._load_input_tree(args.input, args.format)
+                
+                progress.update(5, "Setup complete")
+            
+            self.logger.info(f"Loaded input tree with {input_tree.node_count} nodes")
+            if not args.quiet:
+                print(f"📥 Loaded input tree with {input_tree.node_count:,} nodes")
 
             with SQLiteTaxonomyRepository(args.database) as repository:
-                # Determine attachment strategy
-                attachment_info = self._determine_attachment_strategy(repository, input_tree, args)
+                # Step 2: Determine attachment strategy with progress
+                with progress_manager.operation(
+                    total=3,
+                    description="Analyzing attachment strategy"
+                ) as progress:
+                    
+                    progress.update(1, "Scanning database nodes")
+                    # Database scanning happens in _determine_attachment_strategy
+                    
+                    progress.update(2, "Finding attachment points")
+                    attachment_info = self._determine_attachment_strategy(repository, input_tree, args)
+                    
+                    progress.update(3, "Strategy analysis complete")
                 
                 if args.dry_run:
                     return self._preview_import(repository, input_tree, attachment_info, args)
                 else:
-                    return self._execute_import(repository, input_tree, attachment_info, args)
+                    return self._execute_import_with_progress(repository, input_tree, attachment_info, args)
 
         except ValidationError as e:
             self.logger.error(f"Validation error: {e.message}")
@@ -306,6 +417,30 @@ Examples:
         print(f"   💡 Use without --dry-run to apply changes")
         return 0
 
+    def _execute_import_with_progress(self, repository, input_tree: TaxonomyTree, attachment_info: Dict, args) -> int:
+        """Execute the tree import with progress tracking."""
+        # Step 3: Execute import with comprehensive progress tracking
+        total_operations = input_tree.node_count + 10  # Extra operations for setup/cleanup
+        
+        with progress_manager.operation(
+            total=total_operations,
+            description=f"Importing {input_tree.node_count} nodes"
+        ) as progress:
+            
+            progress.update(5, f"Starting {attachment_info['strategy']} strategy")
+            
+            if attachment_info["strategy"] == "replace":
+                result = self._execute_replace_strategy_with_progress(
+                    repository, input_tree, attachment_info, args, progress
+                )
+            else:
+                result = self._execute_merge_strategy_with_progress(
+                    repository, input_tree, attachment_info, args, progress
+                )
+            
+            progress.update(total_operations, "Import completed successfully")
+            return result
+
     def _execute_import(self, repository, input_tree: TaxonomyTree, attachment_info: Dict, args) -> int:
         """Execute the tree import."""
         if attachment_info["strategy"] == "replace":
@@ -439,6 +574,175 @@ Examples:
         print(f"   ⚠️  Nodes skipped: {skipped_count}")
         
         return 0
+
+    def _execute_merge_strategy_with_progress(self, repository, input_tree: TaxonomyTree, attachment_info: Dict, args, progress) -> int:
+        """Execute merge strategy with progress tracking."""
+        db_attachment = attachment_info["database_attachment_node"]
+        input_root = attachment_info["input_root_node"]
+        
+        added_count = 0
+        updated_count = 0
+        skipped_count = 0
+        
+        progress.update(10, "Getting next available tax_id")
+        next_tax_id = repository.get_next_tax_id()
+        
+        # Process nodes in dependency order (parents before children)
+        processed_nodes = set()
+        node_id_mapping = {}  # Map old_id -> new_id
+        current_progress = 15
+        
+        progress.update(current_progress, "Processing root nodes")
+        
+        # Handle input root processing (same logic as original but with progress)
+        if input_root and args.attach_to and input_root.name == args.attach_to:
+            node_id_mapping[input_root.tax_id] = db_attachment.tax_id
+            processed_nodes.add(input_root.tax_id)
+            if not args.quiet:
+                print(f"   🔗 Merging input root '{input_root.name}' with existing node")
+        elif input_root:
+            new_root = self._create_node_copy(input_root, db_attachment.tax_id, next_tax_id)
+            
+            existing = repository.get_node_by_name(new_root.name)
+            if existing and args.on_conflict == "skip":
+                node_id_mapping[input_root.tax_id] = existing.tax_id
+                skipped_count += 1
+                if not args.quiet:
+                    print(f"   ⚠️  Skipped existing node: {new_root.name}")
+            elif existing and args.on_conflict == "update":
+                repository.update_node(existing.tax_id, new_root.name, new_root.rank, new_root.parent_id)
+                node_id_mapping[input_root.tax_id] = existing.tax_id
+                updated_count += 1
+                if not args.quiet:
+                    print(f"   🔄 Updated node: {new_root.name}")
+            else:
+                repository.add_node(new_root)
+                node_id_mapping[input_root.tax_id] = new_root.tax_id
+                added_count += 1
+                next_tax_id += 1
+                if not args.quiet:
+                    print(f"   ➕ Added node: {new_root.name} (ID: {new_root.tax_id})")
+            
+            processed_nodes.add(input_root.tax_id)
+        else:
+            # Handle orphaned nodes with progress
+            orphaned_nodes = [n for n in input_tree if n.parent_id is None]
+            for i, node in enumerate(orphaned_nodes):
+                new_node = self._create_node_copy(node, db_attachment.tax_id, next_tax_id)
+                
+                existing = repository.get_node_by_name(new_node.name)
+                if existing and args.on_conflict == "skip":
+                    node_id_mapping[node.tax_id] = existing.tax_id
+                    skipped_count += 1
+                    if not args.quiet:
+                        print(f"   ⚠️  Skipped existing node: {new_node.name}")
+                elif existing and args.on_conflict == "update":
+                    repository.update_node(existing.tax_id, new_node.name, new_node.rank, new_node.parent_id)
+                    node_id_mapping[node.tax_id] = existing.tax_id
+                    updated_count += 1
+                    if not args.quiet:
+                        print(f"   🔄 Updated node: {new_node.name}")
+                else:
+                    repository.add_node(new_node)
+                    node_id_mapping[node.tax_id] = new_node.tax_id
+                    added_count += 1
+                    next_tax_id += 1
+                    if not args.quiet:
+                        print(f"   ➕ Added node: {new_node.name} (ID: {new_node.tax_id})")
+                
+                processed_nodes.add(node.tax_id)
+                
+                # Update progress for orphaned nodes
+                if i % args.progress_interval == 0:
+                    progress.update(
+                        current_progress + (i * 20 // len(orphaned_nodes)),
+                        f"Processed {i}/{len(orphaned_nodes)} orphaned nodes"
+                    )
+        
+        current_progress = 35
+        progress.update(current_progress, "Processing remaining nodes in dependency order")
+
+        # Process remaining nodes with progress tracking
+        remaining_nodes = [n for n in input_tree if n.tax_id not in processed_nodes]
+        total_remaining = len(remaining_nodes)
+        processed_remaining = 0
+        
+        while remaining_nodes:
+            progress_made = False
+            nodes_to_process = remaining_nodes.copy()
+            
+            for node in nodes_to_process:
+                parent_mapped = (node.parent_id is None or 
+                               node.parent_id in node_id_mapping or
+                               node.parent_id in processed_nodes)
+                
+                if parent_mapped:
+                    if node.parent_id is None:
+                        new_parent_id = db_attachment.tax_id
+                    else:
+                        new_parent_id = node_id_mapping.get(node.parent_id, node.parent_id)
+                    
+                    new_node = self._create_node_copy(node, new_parent_id, next_tax_id)
+                    
+                    existing = repository.get_node_by_name(new_node.name)
+                    if existing and args.on_conflict == "skip":
+                        node_id_mapping[node.tax_id] = existing.tax_id
+                        skipped_count += 1
+                        if not args.quiet:
+                            print(f"   ⚠️  Skipped existing node: {new_node.name}")
+                    elif existing and args.on_conflict == "update":
+                        repository.update_node(existing.tax_id, new_node.name, new_node.rank, new_node.parent_id)
+                        node_id_mapping[node.tax_id] = existing.tax_id
+                        updated_count += 1
+                        if not args.quiet:
+                            print(f"   🔄 Updated node: {new_node.name}")
+                    else:
+                        repository.add_node(new_node)
+                        node_id_mapping[node.tax_id] = new_node.tax_id
+                        added_count += 1
+                        next_tax_id += 1
+                        if not args.quiet:
+                            print(f"   ➕ Added node: {new_node.name} (ID: {new_node.tax_id})")
+                    
+                    processed_nodes.add(node.tax_id)
+                    remaining_nodes.remove(node)
+                    processed_remaining += 1
+                    progress_made = True
+                    
+                    # Update progress every interval
+                    if processed_remaining % args.progress_interval == 0:
+                        progress_percent = current_progress + (processed_remaining * 50 // total_remaining)
+                        progress.update(
+                            progress_percent,
+                            f"Processed {processed_remaining}/{total_remaining} remaining nodes"
+                        )
+            
+            if not progress_made and remaining_nodes:
+                # This shouldn't happen in a well-formed tree
+                unprocessed_names = [n.name for n in remaining_nodes[:5]]
+                self.logger.warning(f"Cannot process nodes due to missing parents: {unprocessed_names}")
+                break
+
+        progress.update(85, "Finalizing merge operation")
+        
+        if not args.quiet:
+            print(f"✅ Merge completed:")
+            print(f"   ➕ Added: {added_count} nodes")
+            print(f"   🔄 Updated: {updated_count} nodes") 
+            print(f"   ⚠️  Skipped: {skipped_count} nodes")
+
+        return 0
+
+    def _execute_replace_strategy_with_progress(self, repository, input_tree: TaxonomyTree, attachment_info: Dict, args, progress) -> int:
+        """Execute replace strategy with progress tracking."""
+        progress.update(10, "Starting replace strategy")
+        
+        # For now, delegate to the original method (replace strategy is more complex)
+        # In a full implementation, this would have detailed progress tracking
+        result = self._execute_replace_strategy(repository, input_tree, attachment_info, args)
+        
+        progress.update(85, "Replace strategy completed")
+        return result
 
     def _execute_replace_strategy(self, repository, input_tree: TaxonomyTree, attachment_info: Dict, args) -> int:
         """Execute replace strategy - replace existing node with imported tree."""

@@ -192,7 +192,8 @@ class TestBaseCommandValidation:
         # Should not raise exception
         self.command._validate_output_directory("/test/output")
         
-        mock_path_obj.exists.assert_called_once()
+        # exists() is called twice: once in the first condition, once in the create condition
+        assert mock_path_obj.exists.call_count == 2
         mock_path_obj.is_dir.assert_called_once()
     
     @patch('pathlib.Path')

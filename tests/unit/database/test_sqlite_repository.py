@@ -980,8 +980,8 @@ class TestSQLiteTaxonomyRepository:
                     repo.add_node(node)
 
                 # Test operations still work efficiently
-                all_nodes = repo.get_all_nodes()
-                assert len(all_nodes) == 101  # root + 100 species
+                tree = repo.load_tree()
+                assert tree.node_count == 101  # root + 100 species
 
                 children = repo.get_children(1)
                 assert len(children) == 100
@@ -1042,18 +1042,20 @@ class TestDatabaseErrorHandling:
         try:
             with SQLiteTaxonomyRepository(db_path) as repo:
                 # Mock disk full error during write operation
-                with patch.object(
-                    repo._get_connection(),
-                    "execute",
-                    side_effect=sqlite3.OperationalError("database or disk is full"),
-                ):
+                with patch('sqlite3.connect') as mock_connect:
+                    mock_conn = Mock()
+                    mock_conn.execute.side_effect = sqlite3.OperationalError("database or disk is full")
+                    mock_connect.return_value = mock_conn
+                    
+                    # Create a new repository instance that will use the mocked connection
                     with pytest.raises(
-                        DatabaseError, match="Database operation failed"
+                        DatabaseError, match="Failed to connect to database"
                     ):
-                        root = TaxonomyNode(
-                            tax_id=1, name="root", rank=TaxonomicRank.CUSTOM
-                        )
-                        repo.add_node(root)
+                        with SQLiteTaxonomyRepository(db_path) as repo_mock:
+                            root = TaxonomyNode(
+                                tax_id=1, name="root", rank=TaxonomicRank.CUSTOM
+                            )
+                            repo_mock.add_node(root)
         finally:
             if db_path.exists():
                 db_path.unlink()

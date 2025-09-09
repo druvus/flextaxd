@@ -37,6 +37,17 @@ class RequirementType(Enum):
 
 
 @dataclass
+class ExportRequirements:
+    """Container for export format requirements."""
+    format_name: str
+    requirements: List['ExportRequirement']
+    
+    def __iter__(self):
+        """Allow iteration over requirements."""
+        return iter(self.requirements)
+
+
+@dataclass
 class ExportRequirement:
     """Specification for a single export format requirement."""
     
@@ -367,6 +378,21 @@ class ExportValidator:
 export_validator = ExportValidator()
 
 
+def get_format_requirements(format_name: str) -> Optional[ExportRequirements]:
+    """Get export requirements for a specific format.
+    
+    Args:
+        format_name: Name of the export format
+        
+    Returns:
+        ExportRequirements container for the format, or None if unknown format
+    """
+    requirements_list = export_validator._format_requirements.get(format_name)
+    if requirements_list is None:
+        return None
+    return ExportRequirements(format_name=format_name, requirements=requirements_list)
+
+
 def validate_export_requirements(format_name: str, tree: TaxonomyTree, **kwargs) -> ValidationResult:
     """Convenience function to validate export requirements.
     
@@ -395,6 +421,11 @@ def require_export_validation(format_name: str, **validation_kwargs):
     """
     def decorator(export_method: Callable) -> Callable:
         def wrapper(self, tree: TaxonomyTree, output_path: Path, **kwargs):
+            # Check if validation is skipped
+            if kwargs.get("skip_validation", False):
+                logger.debug(f"Skipping export validation for {format_name}")
+                return export_method(self, tree, output_path, **kwargs)
+            
             # Merge validation kwargs with method kwargs
             merged_kwargs = {**validation_kwargs, **kwargs}
             

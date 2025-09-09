@@ -316,7 +316,7 @@ class TestExportValidator:
                 sequence_type="genome",
                 source="TEST"
             )
-            tree.add_genome(2, genome)
+            tree.add_genome(genome)
         
         return tree
 
@@ -333,7 +333,7 @@ class TestExportValidator:
                 sequence_type="genome",
                 source="TEST"
             )
-            tree.add_genome(2, genome)
+            tree.add_genome(genome)
         
         return tree
 
@@ -348,7 +348,7 @@ class TestExportValidator:
                 sequence_type=seq_type,
                 source="TEST"
             )
-            tree.add_genome(2, genome)
+            tree.add_genome(genome)
         
         return tree
 
@@ -384,7 +384,7 @@ class TestExportValidator:
         ]
         
         for genome in genomes:
-            tree.add_genome(2, genome)
+            tree.add_genome(genome)
         
         return tree
 

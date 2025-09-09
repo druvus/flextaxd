@@ -10,12 +10,22 @@ from ..core.exceptions import FlexTaxDError
 from ..utils.logging_config import setup_logging
 from .commands import (
     CreateCommand,
-    ModifyCommand,
     ExportCommand,
     StatsCommand,
     VisualizeCommand,
     PurgeCommand,
+    ValidateCommand,
+    ImportAccessionsCommand,
+    DownloadCommand,
+    RegisterCommand,
+    ListMissingCommand,
+    ValidateFilesCommand,
+    AssignAccessionsCommand,
 )
+from .commands.export_mappings import ExportMappingsCommand
+from .commands.add_node import AddNodeCommand
+from .commands.import_tree import ImportTreeCommand
+from .commands.add_genome import AddGenomeCommand
 from .commands.base import BaseCommand
 
 
@@ -26,13 +36,54 @@ def create_parser() -> argparse.ArgumentParser:
         description="Flexible modification of taxonomy databases",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+Command Categories:
+  DATABASE OPERATIONS:
+    create              Create taxonomy database from various sources
+    stats               Display database statistics and analysis  
+    validate            Validate database integrity and files
+    purge               Remove nodes without data
+    
+  DATA MANAGEMENT:
+    download            Download genomes by accession
+    import-accessions   Import accession mappings
+    register            Register sequence files
+    assign-accessions   Auto-assign accessions
+    
+  NODE OPERATIONS:
+    add-node            Add single taxonomy node
+    add-genome          Add genome to node
+    import-tree         Import taxonomy tree
+    
+  EXPORT & ANALYSIS:
+    export              Export to classification tools
+    export-mappings     Export mapping files
+    visualize           Generate visualizations
+    
+  FILE OPERATIONS:
+    validate-files      Validate file integrity
+    list-missing        List missing files
+
 Examples:
+  # Database creation and management
   flextaxd create --input taxonomy.tsv --database my_db.ftd
-  flextaxd export --database my_db.ftd --format ncbi --output ./output/
-  flextaxd stats --database my_db.ftd
+  flextaxd stats --database my_db.ftd --detailed
+  flextaxd validate --database my_db.ftd --level comprehensive
+  
+  # Data management
+  flextaxd download --database my_db.ftd --missing --type genome --output-dir genomes/
+  flextaxd import-accessions --mapping-file acc2taxid.txt --database my_db.ftd
+  
+  # Export operations  
+  flextaxd export --database my_db.ftd --classifier kraken2 --output kraken2_db/
+  flextaxd export-mappings --database my_db.ftd --format accession2taxid --output acc2taxid.txt
+  flextaxd download --accession-file genomes.txt --database my_db.ftd --output-dir ./genomes
+  flextaxd register --genomes /data/*.fna --proteins /data/proteins/*.faa --database my_db.ftd
+  
+  # Export and validation
+  flextaxd export --database my_db.ftd --classifier kraken2 --output ./kraken2_db/
+  flextaxd export-mappings --database my_db.ftd --format accession2taxid --output acc2taxid.txt
+  flextaxd validate --database my_db.ftd --level comprehensive
   flextaxd visualize --database my_db.ftd --type tree --max-depth 3
-  flextaxd modify --database my_db.ftd --add-node "New Species" --parent-id 12345
-  flextaxd purge --database my_db.ftd --backup my_db_backup.ftd
 
 For more help on a specific command, use:
   flextaxd COMMAND --help
@@ -61,13 +112,33 @@ For more help on a specific command, use:
         dest="command", help="Available commands", metavar="COMMAND"
     )
 
-    # Register subcommands
+    # Register subcommands in logical order
+    
+    # Database Operations
     CreateCommand.register_parser(subparsers)
-    ModifyCommand.register_parser(subparsers)
-    ExportCommand.register_parser(subparsers)
     StatsCommand.register_parser(subparsers)
-    VisualizeCommand.register_parser(subparsers)
+    ValidateCommand.register_parser(subparsers)
     PurgeCommand.register_parser(subparsers)
+    
+    # Data Management
+    DownloadCommand.register_parser(subparsers)
+    ImportAccessionsCommand.register_parser(subparsers)
+    RegisterCommand.register_parser(subparsers)
+    AssignAccessionsCommand.register_parser(subparsers)
+    
+    # Node Operations  
+    AddNodeCommand.register_parser(subparsers)
+    AddGenomeCommand.register_parser(subparsers)
+    ImportTreeCommand.register_parser(subparsers)
+    
+    # Export & Analysis
+    ExportCommand.register_parser(subparsers)
+    ExportMappingsCommand.register_parser(subparsers)
+    VisualizeCommand.register_parser(subparsers)
+    
+    # File Operations
+    ValidateFilesCommand.register_parser(subparsers)
+    ListMissingCommand.register_parser(subparsers)
 
     return parser
 
@@ -98,11 +169,22 @@ def main(argv: Optional[List[str]] = None) -> int:
         # Import and run the appropriate command
         command_classes: Dict[str, type[BaseCommand]] = {
             "create": CreateCommand,
-            "modify": ModifyCommand,
             "export": ExportCommand,
+            "export-mappings": ExportMappingsCommand,
             "stats": StatsCommand,
             "visualize": VisualizeCommand,
             "purge": PurgeCommand,
+            "validate": ValidateCommand,
+            "import-accessions": ImportAccessionsCommand,
+            "download": DownloadCommand,
+            "register": RegisterCommand,
+            "list-missing": ListMissingCommand,
+            "validate-files": ValidateFilesCommand,
+            "assign-accessions": AssignAccessionsCommand,
+            # New focused commands
+            "add-node": AddNodeCommand,
+            "import-tree": ImportTreeCommand,
+            "add-genome": AddGenomeCommand,
         }
 
         command_class = command_classes[args.command]

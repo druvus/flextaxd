@@ -34,6 +34,12 @@ class TestGenomeCLIIntegration:
                 self.genomes_path = attrs.get("genomes_path", None)
                 self.auto_detect_sequences = attrs.get("auto_detect_sequences", False)
                 self.sequence_type = attrs.get("sequence_type", "genome")
+                
+                # NCBI datasets args (Phase 3 enhancement)
+                self.ncbi_datasets = attrs.get("ncbi_datasets", None)
+                self.taxonomy_only = attrs.get("taxonomy_only", False)
+                self.assembly_level = attrs.get("assembly_level", None)
+                self.max_genomes = attrs.get("max_genomes", None)
 
                 # Export args
                 self.output = attrs.get("output")
@@ -42,6 +48,33 @@ class TestGenomeCLIIntegration:
                 self.include_genomes = attrs.get("include_genomes", True)
                 self.names_file = attrs.get("names_file", None)
                 self.nodes_file = attrs.get("nodes_file", None)
+                self.skip_validation = attrs.get("skip_validation", False)
+                self.validate_files = attrs.get("validate_files", False)
+                
+                # Additional export format args
+                self.include_header = attrs.get("include_header", True)
+                self.separator = attrs.get("separator", "\t")
+                self.legacy_format = attrs.get("legacy_format", None)
+                self.classifier = attrs.get("classifier", None)
+                
+                # Global CLI options (from main parser) - required by all commands
+                self.verbose = attrs.get("verbose", 0)
+                self.quiet = attrs.get("quiet", False)
+                self.log_file = attrs.get("log_file", None)
+                self.command = attrs.get("command", 'create')
+                
+                # Progress-related options (expected by CLI commands with progress indicators)
+                self.progress_width = attrs.get("progress_width", 80)
+                self.no_eta = attrs.get("no_eta", False)
+                self.no_rate = attrs.get("no_rate", False)
+                self.progress_log = attrs.get("progress_log", None)
+                self.progress_interval = attrs.get("progress_interval", 1.0)
+                
+                # Additional command-specific options
+                self.dry_run = attrs.get("dry_run", False)
+                self.force = attrs.get("force", False)
+                self.disable_parallel = attrs.get("disable_parallel", False)
+                self.max_workers = attrs.get("max_workers", 4)
 
         return MockArgs(**kwargs)
 
@@ -364,7 +397,6 @@ GCF_000002305.1\t8"""  # Using auto-generated taxonomy IDs
             # Should have multiple taxonomy levels from GTDB hierarchy
             assert stats["node_count"] >= 7  # Domain through species for each lineage
 
-    @pytest.mark.skip("NCBI parser integration needs topology sorting fix")
     def test_ncbi_format_integration(self, tmp_path: Path):
         """Test NCBI format with accession2taxid integration."""
         # Create minimal NCBI nodes.dmp with complete parent chain (ordered parent-first)

@@ -161,43 +161,11 @@ class MockData:
             }
         }
     
-    @staticmethod 
-    def get_modify_command_args() -> Dict[str, Dict[str, Any]]:
-        """Get various argument combinations for modify command testing."""
-        return {
-            "add_node": {
-                "database": "/test/db.ftd",
-                "add_node": "New Species",
-                "parent_id": 8,
-                "rank": "species",
-                "verbose": False
-            },
-            "update_node": {
-                "database": "/test/db.ftd",
-                "update_node": 8,
-                "name": "Updated Name",
-                "verbose": False
-            },
-            "delete_node": {
-                "database": "/test/db.ftd", 
-                "delete_node": 8,
-                "force": True,
-                "verbose": False
-            },
-            "mod_file": {
-                "database": "/test/db.ftd",
-                "mod_file": "/test/modifications.tsv",
-                "replace": False,
-                "verbose": True
-            },
-            "batch_replace": {
-                "database": "/test/db.ftd",
-                "mod_file": "/test/replacements.tsv",
-                "replace": True,
-                "backup": "/test/backup.ftd",
-                "verbose": False
-            }
-        }
+    # NOTE: modify command functionality has been split into focused commands:
+    # - add-node: For single node operations
+    # - import-tree: For tree import with merge/replace strategies  
+    # - add-genome: For genome operations
+    # Mock args for these commands are in their respective test files.
     
     @staticmethod
     def get_stats_command_args() -> Dict[str, Dict[str, Any]]:

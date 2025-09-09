@@ -42,8 +42,8 @@ class Ganon2Exporter(DirectoryBasedExporter):
     - Direct use with Ganon2 classification workflows
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, max_workers: int = 4, **kwargs) -> None:
+        super().__init__(max_workers=max_workers, **kwargs)
         self._unique_names: Dict[str, int] = {}
         self._processed_names: Set[str] = set()
         self._node_name_mapping: Dict[int, str] = {}

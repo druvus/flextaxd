@@ -28,6 +28,8 @@ Welcome to the FlexTaxD documentation. This directory contains guides and refere
 ### Technical Documentation
 - [**Strategic Improvement Plan**](FLEXTAXD_STRATEGIC_IMPROVEMENT_PLAN.md) - Development roadmap
 - [**Refactoring Summary**](REFACTORING_SUMMARY.md) - Architecture improvements
+- [**Test Reorganization Plan**](REORGANIZATION_PLAN.md) - Test suite reorganization strategy
+- [**Test Reorganization Report**](REORGANIZATION_COMPLETED.md) - Completed test suite improvements
 
 ## Quick Navigation
 
@@ -44,35 +46,53 @@ Welcome to the FlexTaxD documentation. This directory contains guides and refere
 
 ## FlexTaxD Overview
 
+FlexTaxD is a bioinformatics tool for creating, managing, and exporting taxonomy databases. The software supports multiple input formats and provides export capabilities for integration with classification tools and analysis pipelines.
+
 ### Core Features
-- **Modern CLI design**: Intuitive --classifier/--format distinction for exports
-- **22+ export formats**: Support for major bioinformatics classification tools
-- **6 input parsers**: TSV, NCBI, GTDB, QIIME, CanSNPer, SILVA formats
-- **Database management**: SQLite-based storage with modification support
-- **Visualization**: Tree plots and Newick format export (requires BioPython)
+- Input format support with automated format detection (6 parsers)
+- Export functionality for classification tools and data formats (22+ formats)
+- SQLite database backend with transaction support
+- Multi-level validation system for data integrity
+- Structured command-line interface with comprehensive help
+- Visualization capabilities and statistics reporting
 
 ### CLI Design (2024 Update)
 FlexTaxD uses a clear separation for exports:
 - **`--classifier`**: Tools that create database structures (Kraken2, Diamond, Metabuli, etc.)
 - **`--format`**: Single file exports (TSV, JSON, accession2taxid, etc.)
 
-### Supported Classification Tools
-- **Kraken2/Bracken**: Metagenomic classification
-- **Diamond**: Protein sequence alignment
-- **Ganon/Ganon2**: Hierarchical classification
-- **Sourmash**: k-mer profiling
-- **Sylph**: Genome sketching  
-- **Kaiju**: NCBI-compliant protein classification
-- **MALT**: MEGAN alignment tool
-- **Metabuli**: Modern NCBI-style format (NEW)
-- **MetaCache**: Multiple format support (NEW)
-- **MMseqs2**: Enhanced NCBI format (NEW)
+### Classification Tools Support (22+ Formats)
 
-### Quality Status
-- **Test coverage**: Core functionality tested
-- **Type annotations**: Present throughout codebase  
-- **Modular architecture**: Plugin-based parsers and exporters
-- **Active development**: Regular updates and improvements
+FlexTaxD provides export functionality for the following tool categories:
+
+#### Directory-Based Classifiers (`--classifier`)
+- **Kraken2/Bracken**: Metagenomic classification
+- **Diamond**: Protein sequence alignment databases
+- **Ganon/Ganon2**: Hierarchical classification formats
+- **Sourmash**: k-mer-based profiling databases
+- **Sylph**: Genome sketching format  
+- **Kaiju**: NCBI-compliant protein classification
+- **MALT**: MEGAN alignment tool format
+- **Metabuli**: Modern NCBI-style with merged taxonomy
+- **MetaCache**: Multiple format types (ncbi_taxonomy, assembly_summary)
+- **MMseqs2**: Enhanced NCBI format with LCA mappings
+- **Centrifuge**: Compressed suffix array format
+- **Melon**: Long-read taxonomic profiling
+
+#### Single File Formats (`--format`) 
+- **TSV/JSON**: Structured data formats
+- **Newick**: Phylogenetic tree format
+- **accession2taxid/nucl2taxid/prot2taxid**: NCBI-style sequence mappings
+- **genome_sizes**: Genome size annotations
+- **And many more...**
+
+### Implementation Status
+- Test infrastructure: Recently stabilized through systematic debugging
+- Modular architecture with extensible parsers and exporters
+- Type annotations and error handling throughout codebase
+- SQLite database backend with transaction support
+- Validation and logging frameworks implemented
+- Command-line interface with comprehensive help documentation
 
 ## Basic Usage Examples
 
@@ -104,4 +124,4 @@ flextaxd export --database my_db.ftd --format accession2taxid --output acc2taxid
 
 ---
 
-**FlexTaxD** - Modern taxonomy database management for bioinformatics workflows
+**FlexTaxD** - Taxonomy database management for bioinformatics workflows

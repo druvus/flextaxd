@@ -173,11 +173,11 @@ class NCBITaxonomyParser(DirectoryBasedParser):
                 except (ValueError, IndexError) as e:
                     raise ParseError(f"Error parsing nodes file line {line_num}: {e}")
 
-        # Sort nodes to ensure parents are added before children
-        nodes_data.sort(key=lambda x: (x["parent_id"] is None, x["tax_id"]))
+        # Perform topological sorting to ensure parents are added before children
+        sorted_nodes = self._topological_sort(nodes_data)
 
         # Second pass: add nodes to tree
-        for node_data in nodes_data:
+        for node_data in sorted_nodes:
             try:
                 node = TaxonomyNode(
                     tax_id=node_data["tax_id"],
@@ -189,6 +189,7 @@ class NCBITaxonomyParser(DirectoryBasedParser):
             except ValueError as e:
                 # Skip problematic nodes but log the issue
                 self.logger.warning(f"Skipping node {node_data['tax_id']}: {e}")
+                continue
 
         return tree
 
@@ -215,3 +216,51 @@ class NCBITaxonomyParser(DirectoryBasedParser):
         }
 
         return rank_mapping.get(rank_str, TaxonomicRank.CUSTOM)
+    
+    def _topological_sort(self, nodes_data: List[NodeData]) -> List[NodeData]:
+        """Perform topological sorting to ensure parents come before children."""
+        from collections import defaultdict, deque
+        
+        # Create mappings
+        nodes_by_id = {node["tax_id"]: node for node in nodes_data}
+        children_by_parent = defaultdict(list)
+        in_degree = defaultdict(int)
+        
+        # Build dependency graph and calculate in-degrees
+        for node in nodes_data:
+            tax_id = node["tax_id"]
+            parent_id = node["parent_id"]
+            
+            if parent_id is not None:
+                # This node depends on its parent
+                children_by_parent[parent_id].append(tax_id)
+                in_degree[tax_id] += 1
+            
+            # Ensure all nodes have an entry in in_degree
+            if tax_id not in in_degree:
+                in_degree[tax_id] = 0
+        
+        # Kahn's algorithm for topological sorting
+        queue = deque([node_id for node_id, degree in in_degree.items() if degree == 0])
+        sorted_node_ids = []
+        
+        while queue:
+            current_id = queue.popleft()
+            sorted_node_ids.append(current_id)
+            
+            # Process all children of current node
+            for child_id in children_by_parent[current_id]:
+                in_degree[child_id] -= 1
+                if in_degree[child_id] == 0:
+                    queue.append(child_id)
+        
+        # Check for cycles (shouldn't happen in valid taxonomy)
+        if len(sorted_node_ids) != len(nodes_data):
+            # Fall back to simple sorting if we detect cycles
+            missing_nodes = set(nodes_by_id.keys()) - set(sorted_node_ids)
+            self.logger.warning(f"Detected potential cycle in taxonomy. Missing nodes: {missing_nodes}")
+            # Add missing nodes at the end
+            sorted_node_ids.extend(missing_nodes)
+        
+        # Return nodes in topologically sorted order
+        return [nodes_by_id[node_id] for node_id in sorted_node_ids if node_id in nodes_by_id]

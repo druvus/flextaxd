@@ -40,6 +40,44 @@ class TestNewExportersIntegration:
             # Additional CLI args needed by ExportCommand
             args.legacy_format = None
             args.classifier = None
+            
+            # Global CLI options (from main parser) - required by all commands
+            args.verbose = 0
+            args.quiet = False
+            args.log_file = None
+            args.command = 'export'
+            
+            # Progress-related options (expected by CLI commands with progress indicators)
+            args.progress_width = 80
+            args.no_eta = False
+            args.no_rate = False
+            args.progress_log = None
+            args.progress_interval = 1.0
+            
+            # Additional command-specific options
+            args.dry_run = False
+            args.force = False
+            args.disable_parallel = False
+            args.max_workers = 4
+            
+            # Global CLI options (from main parser) - required by all commands
+            args.verbose = 0
+            args.quiet = False
+            args.log_file = None
+            args.command = 'export'
+            
+            # Progress-related options (expected by CLI commands with progress indicators)
+            args.progress_width = 80
+            args.no_eta = False
+            args.no_rate = False
+            args.progress_log = None
+            args.progress_interval = 1.0
+            
+            # Additional command-specific options
+            args.dry_run = False
+            args.force = False
+            args.disable_parallel = False
+            args.max_workers = 4
 
             result = cmd.execute(args)
 
@@ -73,6 +111,44 @@ class TestNewExportersIntegration:
             # Additional CLI args needed by ExportCommand
             args.legacy_format = None
             args.classifier = None
+            
+            # Global CLI options (from main parser) - required by all commands
+            args.verbose = 0
+            args.quiet = False
+            args.log_file = None
+            args.command = 'export'
+            
+            # Progress-related options (expected by CLI commands with progress indicators)
+            args.progress_width = 80
+            args.no_eta = False
+            args.no_rate = False
+            args.progress_log = None
+            args.progress_interval = 1.0
+            
+            # Additional command-specific options
+            args.dry_run = False
+            args.force = False
+            args.disable_parallel = False
+            args.max_workers = 4
+            
+            # Global CLI options (from main parser) - required by all commands
+            args.verbose = 0
+            args.quiet = False
+            args.log_file = None
+            args.command = 'export'
+            
+            # Progress-related options (expected by CLI commands with progress indicators)
+            args.progress_width = 80
+            args.no_eta = False
+            args.no_rate = False
+            args.progress_log = None
+            args.progress_interval = 1.0
+            
+            # Additional command-specific options
+            args.dry_run = False
+            args.force = False
+            args.disable_parallel = False
+            args.max_workers = 4
             result = cmd.execute(args)
 
             assert result == 0
@@ -103,6 +179,44 @@ class TestNewExportersIntegration:
             # Additional CLI args needed by ExportCommand
             args.legacy_format = None
             args.classifier = None
+            
+            # Global CLI options (from main parser) - required by all commands
+            args.verbose = 0
+            args.quiet = False
+            args.log_file = None
+            args.command = 'export'
+            
+            # Progress-related options (expected by CLI commands with progress indicators)
+            args.progress_width = 80
+            args.no_eta = False
+            args.no_rate = False
+            args.progress_log = None
+            args.progress_interval = 1.0
+            
+            # Additional command-specific options
+            args.dry_run = False
+            args.force = False
+            args.disable_parallel = False
+            args.max_workers = 4
+            
+            # Global CLI options (from main parser) - required by all commands
+            args.verbose = 0
+            args.quiet = False
+            args.log_file = None
+            args.command = 'export'
+            
+            # Progress-related options (expected by CLI commands with progress indicators)
+            args.progress_width = 80
+            args.no_eta = False
+            args.no_rate = False
+            args.progress_log = None
+            args.progress_interval = 1.0
+            
+            # Additional command-specific options
+            args.dry_run = False
+            args.force = False
+            args.disable_parallel = False
+            args.max_workers = 4
             result = cmd.execute(args)
 
             assert result == 0
@@ -138,6 +252,44 @@ class TestNewExportersIntegration:
             # Additional CLI args needed by ExportCommand
             args.legacy_format = None
             args.classifier = None
+            
+            # Global CLI options (from main parser) - required by all commands
+            args.verbose = 0
+            args.quiet = False
+            args.log_file = None
+            args.command = 'export'
+            
+            # Progress-related options (expected by CLI commands with progress indicators)
+            args.progress_width = 80
+            args.no_eta = False
+            args.no_rate = False
+            args.progress_log = None
+            args.progress_interval = 1.0
+            
+            # Additional command-specific options
+            args.dry_run = False
+            args.force = False
+            args.disable_parallel = False
+            args.max_workers = 4
+            
+            # Global CLI options (from main parser) - required by all commands
+            args.verbose = 0
+            args.quiet = False
+            args.log_file = None
+            args.command = 'export'
+            
+            # Progress-related options (expected by CLI commands with progress indicators)
+            args.progress_width = 80
+            args.no_eta = False
+            args.no_rate = False
+            args.progress_log = None
+            args.progress_interval = 1.0
+            
+            # Additional command-specific options
+            args.dry_run = False
+            args.force = False
+            args.disable_parallel = False
+            args.max_workers = 4
             result = cmd.execute(args)
 
             assert result == 0
@@ -172,6 +324,25 @@ class TestNewExportersIntegration:
             # Additional CLI args needed by ExportCommand
             args.legacy_format = None
             args.classifier = None
+            
+            # Global CLI options (from main parser) - required by all commands
+            args.verbose = 0
+            args.quiet = False
+            args.log_file = None
+            args.command = 'export'
+            
+            # Progress-related options (expected by CLI commands with progress indicators)
+            args.progress_width = 80
+            args.no_eta = False
+            args.no_rate = False
+            args.progress_log = None
+            args.progress_interval = 1.0
+            
+            # Additional command-specific options
+            args.dry_run = False
+            args.force = False
+            args.disable_parallel = False
+            args.max_workers = 4
             result = cmd.execute(args)
 
             assert result == 0
@@ -207,16 +378,35 @@ class TestNewExportersIntegration:
                 # Additional CLI args needed by ExportCommand
                 args.legacy_format = None
                 args.classifier = None
-                # Format-specific options
-                args.include_merged = False
-                args.format_type = "ncbi_taxonomy"
-                args.sequence_type = "all"
-                args.create_lca_mapping = True
+            
+            # Global CLI options (from main parser) - required by all commands
+            args.verbose = 0
+            args.quiet = False
+            args.log_file = None
+            args.command = 'export'
+            
+            # Progress-related options (expected by CLI commands with progress indicators)
+            args.progress_width = 80
+            args.no_eta = False
+            args.no_rate = False
+            args.progress_log = None
+            args.progress_interval = 1.0
+            
+            # Additional command-specific options
+            args.dry_run = False
+            args.force = False
+            args.disable_parallel = False
+            args.max_workers = 4
+            # Format-specific options
+            args.include_merged = False
+            args.format_type = "ncbi_taxonomy"
+            args.sequence_type = "all"
+            args.create_lca_mapping = True
 
-                result = cmd.execute(args)
-                assert result == 0
+            result = cmd.execute(args)
+            assert result == 0
 
-                formats_outputs[format_name] = output_path
+            formats_outputs[format_name] = output_path
 
             # Validate taxonomic consistency across formats
             self._validate_taxonomic_consistency(formats_outputs)
@@ -238,6 +428,25 @@ class TestNewExportersIntegration:
             # Additional CLI args needed by ExportCommand
             args.legacy_format = None
             args.classifier = None
+            
+            # Global CLI options (from main parser) - required by all commands
+            args.verbose = 0
+            args.quiet = False
+            args.log_file = None
+            args.command = 'export'
+            
+            # Progress-related options (expected by CLI commands with progress indicators)
+            args.progress_width = 80
+            args.no_eta = False
+            args.no_rate = False
+            args.progress_log = None
+            args.progress_interval = 1.0
+            
+            # Additional command-specific options
+            args.dry_run = False
+            args.force = False
+            args.disable_parallel = False
+            args.max_workers = 4
             result = cmd.execute(args)
             assert result == 1  # Should return error code
 
@@ -264,6 +473,25 @@ class TestNewExportersIntegration:
             # Additional CLI args needed by ExportCommand
             args.legacy_format = None
             args.classifier = None
+            
+            # Global CLI options (from main parser) - required by all commands
+            args.verbose = 0
+            args.quiet = False
+            args.log_file = None
+            args.command = 'export'
+            
+            # Progress-related options (expected by CLI commands with progress indicators)
+            args.progress_width = 80
+            args.no_eta = False
+            args.no_rate = False
+            args.progress_log = None
+            args.progress_interval = 1.0
+            
+            # Additional command-specific options
+            args.dry_run = False
+            args.force = False
+            args.disable_parallel = False
+            args.max_workers = 4
             with patch(
                 "flextaxd.utils.subprocess_utils.compress_file"
             ) as mock_compress:
@@ -297,6 +525,25 @@ class TestNewExportersIntegration:
             # Additional CLI args needed by ExportCommand
             args.legacy_format = None
             args.classifier = None
+            
+            # Global CLI options (from main parser) - required by all commands
+            args.verbose = 0
+            args.quiet = False
+            args.log_file = None
+            args.command = 'export'
+            
+            # Progress-related options (expected by CLI commands with progress indicators)
+            args.progress_width = 80
+            args.no_eta = False
+            args.no_rate = False
+            args.progress_log = None
+            args.progress_interval = 1.0
+            
+            # Additional command-specific options
+            args.dry_run = False
+            args.force = False
+            args.disable_parallel = False
+            args.max_workers = 4
             import time
 
             start_time = time.time()
@@ -501,6 +748,25 @@ class TestNewExportersPerformance:
             # Additional CLI args needed by ExportCommand
             args.legacy_format = None
             args.classifier = None
+            
+            # Global CLI options (from main parser) - required by all commands
+            args.verbose = 0
+            args.quiet = False
+            args.log_file = None
+            args.command = 'export'
+            
+            # Progress-related options (expected by CLI commands with progress indicators)
+            args.progress_width = 80
+            args.no_eta = False
+            args.no_rate = False
+            args.progress_log = None
+            args.progress_interval = 1.0
+            
+            # Additional command-specific options
+            args.dry_run = False
+            args.force = False
+            args.disable_parallel = False
+            args.max_workers = 4
             # Format-specific options
             args.include_merged = False
             args.format_type = "ncbi_taxonomy"

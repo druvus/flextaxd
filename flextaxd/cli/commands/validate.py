@@ -8,6 +8,13 @@ import logging
 from .base import BaseCommand
 from ...database.sqlite import SQLiteTaxonomyRepository
 from ...core.exceptions import ValidationError
+from ...utils.progress import (
+    progress_manager, 
+    create_console_reporter, 
+    create_logging_reporter,
+    create_silent_reporter,
+    MultiProgressReporter
+)
 
 
 class ValidateCommand(BaseCommand):
@@ -98,7 +105,82 @@ class ValidateCommand(BaseCommand):
             help="Verbose output with detailed progress information"
         )
 
+        # Progress reporting options
+        progress_group = parser.add_argument_group("Progress reporting options")
+        progress_group.add_argument(
+            "--quiet", "-q", action="store_true",
+            help="Suppress progress bars and non-essential output"
+        )
+        
+        progress_group.add_argument(
+            "--progress-log", type=str, metavar="FILE",
+            help="Write progress information to log file"
+        )
+        
+        progress_group.add_argument(
+            "--progress-interval", type=int, default=1000, metavar="N",
+            help="Progress update interval for large operations (default: 1000)"
+        )
+        
+        progress_group.add_argument(
+            "--no-eta", action="store_true",
+            help="Don't show estimated time remaining in progress bars"
+        )
+        
+        progress_group.add_argument(
+            "--no-rate", action="store_true",
+            help="Don't show processing rate in progress bars"
+        )
+        
+        progress_group.add_argument(
+            "--progress-width", type=int, default=50, metavar="N",
+            help="Width of progress bar (default: 50)"
+        )
+
         return parser
+
+    def _setup_progress_reporting(self, args: argparse.Namespace) -> None:
+        """Setup the progress reporting system based on command arguments."""
+        reporters = []
+        
+        # Console reporter (unless quiet)
+        if not args.quiet:
+            console_reporter = create_console_reporter(
+                width=args.progress_width,
+                show_eta=not args.no_eta,
+                show_rate=not args.no_rate
+            )
+            reporters.append(console_reporter)
+        
+        # Logging reporter (if progress log specified)
+        if hasattr(args, 'progress_log') and args.progress_log:
+            # Setup file logger
+            log_handler = logging.FileHandler(args.progress_log)
+            log_formatter = logging.Formatter(
+                '%(asctime)s - %(levelname)s - %(message)s'
+            )
+            log_handler.setFormatter(log_formatter)
+            
+            progress_logger = logging.getLogger('flextaxd.validation.progress')
+            progress_logger.addHandler(log_handler)
+            progress_logger.setLevel(logging.INFO)
+            
+            logging_reporter = create_logging_reporter(
+                progress_logger, 
+                args.progress_interval
+            )
+            reporters.append(logging_reporter)
+        
+        # If no reporters, use silent reporter
+        if not reporters:
+            reporters.append(create_silent_reporter())
+        
+        # Set up the progress manager
+        if len(reporters) == 1:
+            progress_manager.set_default_reporter(reporters[0])
+        else:
+            multi_reporter = MultiProgressReporter(reporters)
+            progress_manager.set_default_reporter(multi_reporter)
 
     def execute(self, args: argparse.Namespace) -> Optional[int]:
         """Execute the validate command."""
@@ -106,8 +188,13 @@ class ValidateCommand(BaseCommand):
             # Validate database exists
             self._validate_database_path(args.database, must_exist=True)
 
+            # Setup progress reporting system
+            self._setup_progress_reporting(args)
+
             if args.verbose:
                 self.logger.setLevel(logging.DEBUG)
+            
+            if not args.quiet:
                 print("Starting comprehensive validation...")
 
             # Import validation modules
@@ -126,60 +213,123 @@ class ValidateCommand(BaseCommand):
                 
                 if args.export_format:
                     # Validate for specific export format
+                    if not args.quiet:
+                        print(f"Validating requirements for {args.export_format} export...")
+                    
                     validator = GenomeValidator(repository, max_workers=args.max_workers)
-                    results = validator.validate_genomes_for_export(args.export_format)
+                    total_genomes = repository.get_genome_count()
+                    
+                    with progress_manager.operation(
+                        total=total_genomes,
+                        description=f"Validating for {args.export_format} export"
+                    ) as progress:
+                        
+                        # Progress simulation for export validation
+                        progress.update(total_genomes // 4, "Checking format requirements")
+                        progress.update(total_genomes // 2, "Validating genome metadata")
+                        progress.update(3 * total_genomes // 4, "Verifying file dependencies")
+                        
+                        results = validator.validate_genomes_for_export(args.export_format)
+                        
+                        progress.update(total_genomes, "Export validation complete")
+                    
                     self._output_export_validation(results, args)
                     
                 elif args.consistency_only:
                     # Database consistency check only
-                    checker = ConsistencyChecker(repository)
-                    if args.verbose:
+                    if not args.quiet:
                         print("Checking database consistency...")
-                    results = checker.check_full_consistency()
+                    
+                    checker = ConsistencyChecker(repository, max_workers=args.max_workers)
+                    total_nodes = repository.get_node_count()
+                    total_genomes = repository.get_genome_count()
+                    
+                    with progress_manager.operation(
+                        total=total_nodes + total_genomes,
+                        description="Checking database consistency"
+                    ) as progress:
+                        
+                        # Simulate progress for different consistency checks
+                        progress.update(total_nodes // 4, "Checking taxonomy integrity")
+                        progress.update(total_nodes // 2, "Checking genome linkages")  
+                        progress.update(3 * total_nodes // 4, "Detecting duplicates")
+                        
+                        results = checker.check_full_consistency()
+                        
+                        progress.update(total_nodes + total_genomes, "Consistency check complete")
+                    
                     self._output_consistency_results(results, args)
                     
                 elif args.files_only:
                     # File validation only
-                    if args.verbose:
+                    if not args.quiet:
                         print("Validating genome files...")
+                    
                     validator = GenomeValidator(repository, max_workers=args.max_workers)
                     
-                    # Progress callback for verbose mode
-                    def progress_callback(completed, total):
-                        if args.verbose:
-                            print(f"Progress: {completed}/{total} ({completed/total*100:.1f}%)")
+                    # Get total genome count for progress tracking
+                    total_genomes = repository.get_genome_count()
                     
-                    results = validator.validate_all_genomes(
-                        level=validation_level,
-                        progress_callback=progress_callback if args.verbose else None
-                    )
+                    with progress_manager.operation(
+                        total=total_genomes,
+                        description="Validating genome files"
+                    ) as progress:
+                        
+                        # Create progress callback for validator
+                        def progress_callback(completed, total):
+                            progress.update(completed, f"Validated {completed}/{total} genomes")
+                        
+                        results = validator.validate_all_genomes(
+                            level=validation_level,
+                            progress_callback=progress_callback
+                        )
                     
                     validation_report = validator.generate_validation_report(results)
                     self._output_file_validation(validation_report, results, args)
                     
                 else:
                     # Full validation (default)
-                    if args.verbose:
+                    if not args.quiet:
                         print("Running comprehensive validation (files + consistency)...")
+                    
+                    # Get total genome count for progress tracking
+                    total_genomes = repository.get_genome_count()
+                    
+                    # Step 1: File validation with progress
+                    with progress_manager.operation(
+                        total=total_genomes,
+                        description="Validating genome files"
+                    ) as progress:
                         
-                    # File validation
-                    validator = GenomeValidator(repository, max_workers=args.max_workers)
+                        validator = GenomeValidator(repository, max_workers=args.max_workers)
+                        
+                        def file_progress_callback(completed, total):
+                            progress.update(completed, f"Validated {completed}/{total} genomes")
+                        
+                        file_results = validator.validate_all_genomes(
+                            level=validation_level,
+                            progress_callback=file_progress_callback
+                        )
                     
-                    def progress_callback(completed, total):
-                        if args.verbose:
-                            print(f"File validation: {completed}/{total} ({completed/total*100:.1f}%)")
+                    # Step 2: Consistency check with progress
+                    total_nodes = repository.get_node_count()
                     
-                    file_results = validator.validate_all_genomes(
-                        level=validation_level,
-                        progress_callback=progress_callback if args.verbose else None
-                    )
-                    
-                    if args.verbose:
-                        print("Checking database consistency...")
-                    
-                    # Consistency check
-                    checker = ConsistencyChecker(repository)
-                    consistency_results = checker.check_full_consistency()
+                    with progress_manager.operation(
+                        total=total_nodes + total_genomes,  # Estimate operations
+                        description="Checking database consistency"
+                    ) as progress:
+                        
+                        checker = ConsistencyChecker(repository, max_workers=args.max_workers)
+                        
+                        # Simulate progress for consistency checking
+                        # (In real implementation, ConsistencyChecker would support progress callbacks)
+                        progress.update(total_nodes // 4, "Checking taxonomy integrity")
+                        progress.update(total_nodes // 2, "Checking genome linkages")
+                        progress.update(3 * total_nodes // 4, "Detecting duplicates")
+                        
+                        consistency_results = checker.check_full_consistency()
+                        
+                        progress.update(total_nodes + total_genomes, "Consistency check complete")
                     
                     # Combined report
                     file_report = validator.generate_validation_report(file_results)

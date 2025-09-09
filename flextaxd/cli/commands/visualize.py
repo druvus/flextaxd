@@ -26,20 +26,28 @@ class VisualizeCommand(BaseCommand):
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
-  # Show full tree from root
+  # Show tree to stdout
   flextaxd visualize --database my_db.ftd --type tree
   
-  # Limit tree depth
-  flextaxd visualize --database my_db.ftd --type tree --max-depth 3
+  # Save tree as text file
+  flextaxd visualize --database my_db.ftd --type tree --output tree.txt
   
-  # Start from specific node
-  flextaxd visualize --database my_db.ftd --type tree --start-node "Bacteria" --max-depth 2
+  # Save tree as JSON (auto-detected from extension)
+  flextaxd visualize --database my_db.ftd --type tree --output tree.json
   
-  # Show tree with genome counts
-  flextaxd visualize --database my_db.ftd --type tree --show-genomes
+  # Create graphical plot (PNG/PDF auto-detected)
+  flextaxd visualize --database my_db.ftd --type plot --output tree.png
+  flextaxd visualize --database my_db.ftd --type plot --output tree.pdf
   
-  # Compact view with node IDs
-  flextaxd visualize --database my_db.ftd --type tree --show-ids --compact
+  # Generate Newick format file (auto-detected)
+  flextaxd visualize --database my_db.ftd --type newick --output tree.nwk
+  
+  # Advanced tree options
+  flextaxd visualize --database my_db.ftd --type tree --max-depth 3 --show-genomes --output tree.txt
+  flextaxd visualize --database my_db.ftd --type tree --start-node "Bacteria" --show-ids --output bacteria.txt
+  
+  # Plot with custom styling
+  flextaxd visualize --database my_db.ftd --type plot --output plot.png --label-size 12 --clip-labels
             """,
         )
 
@@ -92,30 +100,25 @@ Examples:
         )
 
         parser.add_argument(
-            "--format",
-            choices=["text", "json"],
-            default="text",
-            help="Output format (default: text)",
+            "--output",
+            "-o",
+            type=str,
+            help="Output file path. Format determined by extension or --type: .png/.pdf (plots), .txt (trees), .nwk (newick), .json (JSON trees)",
         )
 
-        # Advanced visualization options (legacy compatibility)
-        parser.add_argument(
+        # Plot-specific options (only relevant for --type plot)
+        plot_group = parser.add_argument_group('plot options', 'Options specific to --type plot')
+        plot_group.add_argument(
             "--label-size",
             type=int,
             default=0,
-            help="Size of labels in graphical plots (0=auto, legacy: --vis_label_size)",
+            help="Size of labels in graphical plots (0=auto)",
         )
 
-        parser.add_argument(
+        plot_group.add_argument(
             "--clip-labels",
             action="store_true",
-            help="Clip long node names in tree visualization (legacy: --vis_clip_labels)",
-        )
-
-        parser.add_argument(
-            "--save-plot",
-            type=str,
-            help="Save graphical plot to file (e.g., tree.png, tree.pdf)",
+            help="Clip long node names in plot visualization",
         )
 
         return parser
@@ -132,10 +135,13 @@ Examples:
 
                 self.logger.info(f"Loaded tree with {tree.node_count} nodes")
 
+                # Determine output format from file extension or type
+                output_format = self._determine_output_format(args)
+                
                 if args.type == "tree":
-                    self._visualize_tree(tree, args)
+                    self._visualize_tree(tree, args, output_format)
                 elif args.type == "summary":
-                    self._visualize_summary(tree, args)
+                    self._visualize_summary(tree, args, output_format)
                 elif args.type == "newick":
                     self._visualize_newick(tree, args)
                 elif args.type == "newick_vis":
@@ -154,27 +160,42 @@ Examples:
             self.logger.error(f"Database error: {e.message}")
             print(f"Database error: {e.message}")
             return 1
+        
+        except ImportError as e:
+            self.logger.error(f"Dependency error: {str(e)}")
+            print(f"Dependency error: {str(e)}")
+            return 1
 
-    def _visualize_tree(self, tree: TaxonomyTree, args: argparse.Namespace) -> None:
+        except KeyboardInterrupt:
+            self.logger.error("Visualization interrupted by user")
+            print("Visualization interrupted")
+            return 1
+
+        except Exception as e:
+            self.logger.error(f"Unexpected error: {str(e)}")
+            print(f"Error: {str(e)}")
+            return 1
+
+    def _visualize_tree(self, tree: TaxonomyTree, args: argparse.Namespace, output_format: str) -> None:
         """Visualize taxonomy tree structure."""
         # Find starting node
         start_node = self._find_start_node(tree, args.start_node)
         if not start_node:
             raise ValidationError(f"Start node '{args.start_node}' not found")
 
-        if args.format == "json":
+        if output_format == "json":
             self._output_tree_json(tree, start_node, args)
         else:
             self._output_tree_text(tree, start_node, args)
 
-    def _visualize_summary(self, tree: TaxonomyTree, args: argparse.Namespace) -> None:
+    def _visualize_summary(self, tree: TaxonomyTree, args: argparse.Namespace, output_format: str) -> None:
         """Visualize tree summary with key statistics."""
         # Find starting node
         start_node = self._find_start_node(tree, args.start_node)
         if not start_node:
             raise ValidationError(f"Start node '{args.start_node}' not found")
 
-        if args.format == "json":
+        if output_format == "json":
             self._output_summary_json(tree, start_node, args)
         else:
             self._output_summary_text(tree, start_node, args)
@@ -211,18 +232,73 @@ Examples:
 
         return None
 
+    def _determine_output_format(self, args: argparse.Namespace) -> str:
+        """Determine output format from file extension or type."""
+        if not hasattr(args, 'output') or not args.output:
+            return "text"  # Default to text for stdout
+        
+        output_path = args.output.lower()
+        
+        # Determine format from file extension
+        if output_path.endswith('.json'):
+            return "json"
+        elif output_path.endswith('.nwk') or output_path.endswith('.newick'):
+            return "newick"
+        elif output_path.endswith('.txt') or output_path.endswith('.tree'):
+            return "text"
+        elif output_path.endswith(('.png', '.pdf', '.svg', '.jpg', '.jpeg')):
+            return "plot"
+        else:
+            # Default based on type
+            if args.type in ["tree", "summary"]:
+                return "text"
+            elif args.type == "newick":
+                return "newick"
+            elif args.type == "plot":
+                return "plot"
+            else:
+                return "text"
+
     def _output_tree_text(
         self, tree: TaxonomyTree, start_node: TaxonomyNode, args: argparse.Namespace
     ) -> None:
         """Output tree in text format."""
-        print(f"Taxonomy Tree Visualization")
-        print(f"{'=' * 50}")
-        print(f"Starting from: {start_node.name}")
+        # Prepare output content
+        output_lines = [
+            f"Taxonomy Tree Visualization",
+            f"{'=' * 50}",
+            f"Starting from: {start_node.name}",
+        ]
+        
         if args.max_depth > 0:
-            print(f"Maximum depth: {args.max_depth}")
-        print()
-
-        self._print_tree_node(tree, start_node, args, depth=0, is_last_sibling=[])
+            output_lines.append(f"Maximum depth: {args.max_depth}")
+        
+        output_lines.append("")  # Empty line
+        
+        # Capture tree output
+        import sys
+        from io import StringIO
+        
+        # Temporarily redirect stdout to capture tree output
+        old_stdout = sys.stdout
+        sys.stdout = tree_buffer = StringIO()
+        
+        try:
+            self._print_tree_node(tree, start_node, args, depth=0, is_last_sibling=[])
+            tree_output = tree_buffer.getvalue()
+        finally:
+            sys.stdout = old_stdout
+        
+        # Combine header and tree content
+        full_output = "\n".join(output_lines) + tree_output
+        
+        # Output to file or stdout
+        if hasattr(args, 'output') and args.output:
+            with open(args.output, 'w', encoding='utf-8') as f:
+                f.write(full_output)
+            print(f"Tree visualization saved to: {args.output}")
+        else:
+            print(full_output)
 
     def _print_tree_node(
         self,
@@ -336,7 +412,15 @@ Examples:
             "tree": build_tree_dict(start_node),
         }
 
-        print(json.dumps(tree_data, indent=2))
+        json_output = json.dumps(tree_data, indent=2)
+        
+        # Output to file or stdout
+        if hasattr(args, 'output') and args.output:
+            with open(args.output, 'w', encoding='utf-8') as f:
+                f.write(json_output)
+            print(f"Tree JSON saved to: {args.output}")
+        else:
+            print(json_output)
 
     def _output_summary_text(
         self, tree: TaxonomyTree, start_node: TaxonomyNode, args: argparse.Namespace
@@ -492,7 +576,14 @@ Examples:
         # Add proper Newick termination
         if not newick_string.endswith(";"):
             newick_string += ";"
-        print(newick_string)
+            
+        # Output to file or stdout
+        if hasattr(args, 'output') and args.output:
+            with open(args.output, 'w', encoding='utf-8') as f:
+                f.write(newick_string + "\n")
+            print(f"Newick tree saved to: {args.output}")
+        else:
+            print(newick_string)
 
     def _visualize_newick_ascii(
         self, tree: TaxonomyTree, args: argparse.Namespace
@@ -621,8 +712,11 @@ Examples:
             )
             plt.tight_layout()
 
-            # Save or display
-            output_file = args.save_plot if args.save_plot else "flextaxd_tree_plot.png"
+            # Determine output file
+            if hasattr(args, 'output') and args.output:
+                output_file = args.output
+            else:
+                output_file = "flextaxd_tree_plot.png"
 
             # Ensure we have an extension
             if not any(

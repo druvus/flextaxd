@@ -16,6 +16,7 @@ from ....fixtures.cli.mock_data import MockData, CLITestHelper
 def create_import_tree_mock_args(**overrides):
     """Create complete mock args for ImportTreeCommand with all required attributes."""
     defaults = {
+        # Required CLI args
         'database': '/test/db.ftd',
         'input': '/test/tree.tsv',
         'strategy': 'merge',
@@ -30,8 +31,23 @@ def create_import_tree_mock_args(**overrides):
         'dry_run': False,
         'force': False,
         'backup': True,
-        'verbose': False,
+        
+        # Global CLI options (from main parser)
+        'verbose': 0,
         'quiet': False,
+        'log_file': None,
+        'command': 'import-tree',
+        
+        # Progress-related options (expected by CLI commands)
+        'progress_width': 80,
+        'no_eta': False,
+        'no_rate': False,
+        'progress_log': None,
+        'progress_interval': 1.0,
+        
+        # Additional command-specific options
+        'disable_parallel': False,
+        'max_workers': 4,
         'skip_validation': True,
     }
     defaults.update(overrides)

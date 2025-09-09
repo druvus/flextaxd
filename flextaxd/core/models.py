@@ -31,6 +31,7 @@ class TaxonomyNode:
     name: str
     rank: TaxonomicRank = TaxonomicRank.CUSTOM
     parent_id: Optional[int] = None
+    description: Optional[str] = None
 
     def __post_init__(self) -> None:
         """Validate node data after initialization."""
@@ -46,22 +47,48 @@ class TaxonomyNode:
 
 @dataclass(frozen=True)
 class GenomeInfo:
-    """Information about a genome associated with a taxonomic node."""
+    """Information about a genome associated with a taxonomic node.
+    
+    Supports multiple types of accessions and allows multiple genomes
+    to be associated with the same taxonomic node (e.g., multiple strains
+    of the same species).
+    
+    Accession Types Supported:
+    - Assembly: GCF_/GCA_ (RefSeq/GenBank assemblies)
+    - Nucleotide: NC_/NZ_/CP_ (chromosome/contig sequences)  
+    - Protein: WP_/YP_/NP_ (protein sequences)
+    - BioSample: SAMN_/SAMD_/SAME_ (sample metadata)
+    
+    Example:
+        # Multiple E. coli genomes for the same species node
+        ecoli_k12 = GenomeInfo(
+            genome_id="ecoli_k12_mg1655",
+            tax_id=511145,  # E. coli str. K-12 substr. MG1655
+            assembly_accession="GCF_000005825.2",
+            strain="K-12 substr. MG1655",
+            source="NCBI"
+        )
+    """
 
     genome_id: str
     tax_id: int
     file_path: Optional[str] = None
     sequence_length: Optional[int] = None
-    sequence_type: Optional[str] = None  # e.g., 'genome', '16S', 'plasmid'
-    assembly_accession: Optional[str] = None
+    sequence_type: Optional[str] = None  # e.g., 'genome', '16S', 'plasmid', 'protein'
+    assembly_accession: Optional[str] = None  # GCF_/GCA_ accessions
+    nucleotide_accession: Optional[str] = None  # NC_/NZ_/CP_ accessions
+    protein_accession: Optional[str] = None  # WP_/YP_/NP_ accessions
+    biosample_accession: Optional[str] = None  # SAMN_/SAMD_/SAME_ accessions
     description: Optional[str] = None
     source: Optional[str] = None  # e.g., 'NCBI', 'GTDB', 'SILVA'
+    strain: Optional[str] = None  # Strain/isolate information
+    file_checksum: Optional[str] = None  # MD5 checksum for file integrity verification
 
     def __post_init__(self) -> None:
         """Validate genome info after initialization."""
         if not self.genome_id.strip():
             raise ValueError("Genome ID cannot be empty")
-        if self.tax_id <= 0:
+        if self.tax_id is not None and self.tax_id <= 0:
             raise ValueError(f"Tax ID must be positive, got {self.tax_id}")
 
     def validate(self) -> List[str]:
@@ -103,6 +130,57 @@ class GenomeInfo:
             except OSError:
                 pass
         return None
+
+    @property
+    def all_accessions(self) -> Dict[str, str]:
+        """Get all available accessions for this genome."""
+        accessions = {}
+        if self.assembly_accession:
+            accessions['assembly'] = self.assembly_accession
+        if self.nucleotide_accession:
+            accessions['nucleotide'] = self.nucleotide_accession
+        if self.protein_accession:
+            accessions['protein'] = self.protein_accession
+        if self.biosample_accession:
+            accessions['biosample'] = self.biosample_accession
+        return accessions
+
+    @property 
+    def primary_accession(self) -> Optional[str]:
+        """Get the primary accession (preference: assembly > nucleotide > protein > biosample)."""
+        if self.assembly_accession:
+            return self.assembly_accession
+        if self.nucleotide_accession:
+            return self.nucleotide_accession
+        if self.protein_accession:
+            return self.protein_accession
+        if self.biosample_accession:
+            return self.biosample_accession
+        return None
+
+    def validate_accessions(self) -> List[str]:
+        """Validate accession number formats."""
+        import re
+        issues = []
+        
+        # Assembly accession patterns (GCF_/GCA_)
+        if self.assembly_accession and not re.match(r'^GC[FA]_\d{9}\.\d+$', self.assembly_accession):
+            issues.append(f"Invalid assembly accession format: {self.assembly_accession}")
+        
+        # Nucleotide accession patterns (NC_/NZ_/CP_/AP_)
+        if self.nucleotide_accession and not re.match(r'^(NC|NZ|CP|AP)_\d+\.\d+$', self.nucleotide_accession):
+            issues.append(f"Invalid nucleotide accession format: {self.nucleotide_accession}")
+        
+        # Protein accession patterns (WP_/YP_/NP_)
+        if self.protein_accession and not re.match(r'^(WP|YP|NP)_\d+\.\d+$', self.protein_accession):
+            issues.append(f"Invalid protein accession format: {self.protein_accession}")
+        
+        
+        # BioSample accession patterns (SAMN_/SAMD_/SAME_)
+        if self.biosample_accession and not re.match(r'^SAM[NDE][A-Z]?\d+$', self.biosample_accession):
+            issues.append(f"Invalid BioSample accession format: {self.biosample_accession}")
+        
+        return issues
 
 
 class TaxonomyTree:
@@ -871,3 +949,262 @@ class TaxonomyTree:
             "nodes_with_genomes": len(nodes_with_genomes),
             "essential_nodes_kept": len(essential_nodes),
         }
+
+
+# Phase 4: Enhanced data models for accession-based architecture
+
+from datetime import datetime
+
+
+@dataclass(frozen=True)
+class EnhancedGenomeInfo:
+    """Enhanced genome information for Phase 4 accession-based architecture.
+    
+    This model replaces GenomeInfo for the new genomes_v2 table and provides
+    comprehensive accession tracking without SRA support.
+    """
+
+    genome_id: str
+    tax_id: int
+    assembly_accession: Optional[str] = None     # GCF_/GCA_ (RefSeq/GenBank)
+    nucleotide_accession: Optional[str] = None   # NC_/NZ_/CP_ (chromosome/contig)
+    biosample_accession: Optional[str] = None    # SAMN_/SAMD_/SAME_ (sample)
+    
+    # File management
+    file_path: Optional[str] = None              # Path to genome FASTA file
+    file_exists: bool = False                    # Current file existence status
+    file_checksum: Optional[str] = None          # SHA256 for integrity
+    file_size: Optional[int] = None
+    last_validated: Optional[datetime] = None    # Last validation timestamp
+    
+    # Metadata
+    sequence_count: Optional[int] = None         # Number of contigs/chromosomes
+    total_length: Optional[int] = None           # Total genome size in bp
+    strain: Optional[str] = None
+    description: Optional[str] = None
+    source: Optional[str] = None                 # NCBI/GTDB/SILVA/custom
+    download_date: Optional[datetime] = None
+
+    def __post_init__(self) -> None:
+        """Validate enhanced genome info after initialization."""
+        if not self.genome_id.strip():
+            raise ValueError("Genome ID cannot be empty")
+        if self.tax_id <= 0:
+            raise ValueError(f"Tax ID must be positive, got {self.tax_id}")
+
+    @property
+    def primary_accession(self) -> Optional[str]:
+        """Get the primary accession for this genome (assembly > nucleotide)."""
+        return self.assembly_accession or self.nucleotide_accession
+
+    def validate(self) -> List[str]:
+        """Validate enhanced genome information."""
+        issues = []
+
+        if not self.genome_id:
+            issues.append("Genome ID cannot be empty")
+        if self.tax_id <= 0:
+            issues.append("Taxonomy ID must be positive")
+
+        # File validation
+        if self.file_path:
+            from pathlib import Path
+            path = Path(self.file_path)
+            if not path.exists():
+                issues.append(f"Genome file does not exist: {self.file_path}")
+            elif not path.is_file():
+                issues.append(f"Path is not a file: {self.file_path}")
+
+        # Accession validation
+        if self.assembly_accession and not self._validate_assembly_accession(self.assembly_accession):
+            issues.append(f"Invalid assembly accession format: {self.assembly_accession}")
+        if self.nucleotide_accession and not self._validate_nucleotide_accession(self.nucleotide_accession):
+            issues.append(f"Invalid nucleotide accession format: {self.nucleotide_accession}")
+        if self.biosample_accession and not self._validate_biosample_accession(self.biosample_accession):
+            issues.append(f"Invalid biosample accession format: {self.biosample_accession}")
+
+        return issues
+
+    @staticmethod
+    def _validate_assembly_accession(accession: str) -> bool:
+        """Validate assembly accession format (GCF_/GCA_)."""
+        import re
+        return bool(re.match(r'^GC[FA]_\d{9}\.\d+$', accession))
+
+    @staticmethod
+    def _validate_nucleotide_accession(accession: str) -> bool:
+        """Validate nucleotide accession format."""
+        import re
+        return bool(re.match(r'^(NC|NZ|CP|AP|AE|AL|AM|BA|BX|CM|FO|FP|FQ|FR)_\d+\.\d+$', accession))
+
+    @staticmethod
+    def _validate_biosample_accession(accession: str) -> bool:
+        """Validate biosample accession format."""
+        import re
+        return bool(re.match(r'^SAM[NDE]\d+$', accession))
+
+
+@dataclass(frozen=True)
+class ProteinInfo:
+    """Information about individual proteins associated with genomes.
+    
+    Note: This tracks protein metadata only. Individual protein files are not tracked -
+    instead, proteins are organized into collection files (taxa-specific or global).
+    """
+
+    protein_id: str                               # Unique protein identifier
+    tax_id: int
+    genome_id: Optional[str] = None              # Link to parent genome
+    protein_accession: Optional[str] = None      # WP_/YP_/NP_ accession
+    gene_name: Optional[str] = None              # Gene name/locus tag
+    
+    # Protein metadata only (no individual file paths)
+    sequence_length: Optional[int] = None        # Protein length in amino acids
+    product: Optional[str] = None                # Protein product description
+    ec_number: Optional[str] = None              # Enzyme commission number
+    go_terms: Optional[str] = None               # Gene ontology terms (JSON)
+
+    def __post_init__(self) -> None:
+        """Validate protein info after initialization."""
+        if not self.protein_id.strip():
+            raise ValueError("Protein ID cannot be empty")
+        if self.tax_id <= 0:
+            raise ValueError(f"Tax ID must be positive, got {self.tax_id}")
+
+    def validate(self) -> List[str]:
+        """Validate protein information."""
+        issues = []
+
+        if not self.protein_id:
+            issues.append("Protein ID cannot be empty")
+        if self.tax_id <= 0:
+            issues.append("Taxonomy ID must be positive")
+
+        # Protein accession validation
+        if self.protein_accession and not self._validate_protein_accession(self.protein_accession):
+            issues.append(f"Invalid protein accession format: {self.protein_accession}")
+
+        return issues
+
+    @staticmethod
+    def _validate_protein_accession(accession: str) -> bool:
+        """Validate protein accession format."""
+        import re
+        return bool(re.match(r'^(WP|YP|NP|XP|AP)_\d+\.\d+$', accession))
+
+
+@dataclass(frozen=True)
+class SequenceFile:
+    """Information about sequence files that can contain multiple taxa/sequences.
+    
+    This model tracks files containing sequences (genomes or proteins) and supports
+    flexible file organization strategies.
+    """
+
+    file_id: Optional[int] = None                # Auto-generated
+    file_path: str = ""                          # Path to sequence file
+    file_type: str = ""                          # 'genome', 'protein_taxa', 'protein_global'
+    scope: str = ""                              # 'single_taxa', 'multi_taxa', 'global'
+    taxa_count: int = 1                          # Number of taxa in file
+    sequence_count: Optional[int] = None         # Total sequences in file
+    
+    # File management
+    file_exists: bool = False
+    file_checksum: Optional[str] = None
+    file_size: Optional[int] = None
+    last_validated: Optional[datetime] = None
+    created_date: Optional[datetime] = None
+
+    def __post_init__(self) -> None:
+        """Validate sequence file info after initialization."""
+        if not self.file_path.strip():
+            raise ValueError("File path cannot be empty")
+        if self.file_type not in ['genome', 'protein_taxa', 'protein_global']:
+            raise ValueError(f"Invalid file type: {self.file_type}")
+        if self.scope not in ['single_taxa', 'multi_taxa', 'global']:
+            raise ValueError(f"Invalid scope: {self.scope}")
+
+
+@dataclass(frozen=True)
+class AccessionMapping:
+    """Mapping between accessions and taxonomy IDs.
+    
+    This model supports the accession2taxid functionality without SRA support.
+    """
+
+    accession: str                               # Primary accession
+    accession_version: Optional[str] = None      # Versioned accession
+    tax_id: int = 0
+    accession_type: Optional[str] = None         # 'assembly'/'nucleotide'/'protein'
+
+    def __post_init__(self) -> None:
+        """Validate accession mapping after initialization."""
+        if not self.accession.strip():
+            raise ValueError("Accession cannot be empty")
+        if self.tax_id <= 0:
+            raise ValueError(f"Tax ID must be positive, got {self.tax_id}")
+        if self.accession_type and self.accession_type not in ['assembly', 'nucleotide', 'protein']:
+            raise ValueError(f"Invalid accession type: {self.accession_type}")
+
+    def validate(self) -> List[str]:
+        """Validate accession mapping."""
+        issues = []
+
+        if not self.accession:
+            issues.append("Accession cannot be empty")
+        if self.tax_id <= 0:
+            issues.append("Taxonomy ID must be positive")
+
+        return issues
+
+
+@dataclass
+class FileRegistryEntry:
+    """Registry entry for tracking and validating sequence files.
+    
+    This model supports file tracking, validation, and repair operations.
+    """
+
+    file_id: Optional[int] = None                # Auto-generated
+    file_path: str = ""                          # Path to file
+    file_type: str = ""                          # 'genome'/'protein_taxa'/'protein_global'
+    entity_id: str = ""                          # genome_id or tax_id or 'global'
+    tax_id: Optional[int] = None                 # NULL for global protein db
+    
+    # File status
+    expected_path: Optional[str] = None          # Original/expected path
+    actual_path: Optional[str] = None            # Current actual path (if moved)
+    exists: bool = False
+    accessible: bool = False
+    valid_format: bool = False
+    
+    # File metadata
+    size_bytes: Optional[int] = None
+    checksum: Optional[str] = None
+    last_checked: Optional[datetime] = None
+    
+    # Issues tracking
+    issue_type: Optional[str] = None             # 'missing'/'moved'/'corrupted'/'inaccessible'
+    issue_description: Optional[str] = None
+    repair_attempted: bool = False
+    repair_date: Optional[datetime] = None
+
+    def __post_init__(self) -> None:
+        """Validate registry entry after initialization."""
+        if not self.file_path.strip():
+            raise ValueError("File path cannot be empty")
+        if not self.entity_id.strip():
+            raise ValueError("Entity ID cannot be empty")
+        if self.file_type not in ['genome', 'protein_taxa', 'protein_global']:
+            raise ValueError(f"Invalid file type: {self.file_type}")
+
+    def validate(self) -> List[str]:
+        """Validate registry entry."""
+        issues = []
+
+        if not self.file_path:
+            issues.append("File path cannot be empty")
+        if not self.entity_id:
+            issues.append("Entity ID cannot be empty")
+
+        return issues

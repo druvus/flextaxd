@@ -69,6 +69,9 @@ class BaseCommand(ABC):
         from pathlib import Path
         from ...core.exceptions import ValidationError
 
+        if not output_path or not output_path.strip():
+            raise ValidationError("Output directory path cannot be empty")
+
         path = Path(output_path)
 
         if path.exists() and not path.is_dir():

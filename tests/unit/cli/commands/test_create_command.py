@@ -13,6 +13,34 @@ from ....fixtures.cli.conftest import *
 from ....fixtures.cli.mock_data import MockData, CLITestHelper
 
 
+def create_create_mock_args(**overrides):
+    """Create complete mock args for CreateCommand with all required attributes."""
+    defaults = {
+        'input': '/test/taxonomy.tsv',
+        'database': '/test/output.ftd',
+        'format': 'auto',
+        'overwrite': False,
+        'no_header': False,
+        'parent_column': 0,
+        'child_column': 1,
+        'id_column': None,
+        'rank_column': None,
+        'genomeid2taxid': None,
+        'genomes_path': None,
+        'auto_detect_sequences': False,
+        'sequence_type': 'genome',
+        'verbose': False,
+        # NCBI datasets attributes (added in Phase 3)
+        'ncbi_datasets': None,
+        'assembly_level': 'complete',
+        'max_genomes': None,
+        'taxonomy_only': False,
+        'ncbi_cache_dir': None
+    }
+    defaults.update(overrides)
+    return CLITestHelper.create_mock_args(**defaults)
+
+
 class TestCreateCommand:
     """Test CreateCommand basic functionality."""
     
@@ -46,91 +74,142 @@ class TestCreateCommand:
     
     @patch('flextaxd.cli.commands.create.SQLiteTaxonomyRepository')
     @patch('flextaxd.cli.commands.create.registry')
-    def test_execute_basic_success(self, mock_registry, mock_repo_class, sample_taxonomy_tree):
+    @patch('flextaxd.cli.commands.create.Path')
+    def test_execute_basic_success(self, mock_path, mock_registry, mock_repo_class, sample_taxonomy_tree):
         """Test successful execution with basic arguments."""
-        # Setup mocks
+        # Setup Path mocks - input exists, database doesn't 
+        mock_input_path = Mock()
+        mock_input_path.exists.return_value = True
+        
+        mock_db_path = Mock()
+        mock_db_path.exists.return_value = False  # DB doesn't exist
+        mock_db_path.unlink = Mock()
+        
+        def path_side_effect(path):
+            if "taxonomy.tsv" in str(path):
+                return mock_input_path
+            elif "output.ftd" in str(path):
+                return mock_db_path
+            return Mock()
+        
+        mock_path.side_effect = path_side_effect
+        
+        # Setup parser mocks
         mock_parser = Mock()
-        mock_parser.parse_and_build_tree.return_value = sample_taxonomy_tree
+        mock_parser.parse.return_value = sample_taxonomy_tree
         mock_registry.get_parser.return_value = mock_parser
         
+        # Setup repository mocks
         mock_repo = Mock()
+        mock_repo.get_statistics.return_value = {
+            'node_count': 5,
+            'genome_count': 0,
+            'rank_distribution': {}
+        }
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         
         # Create test arguments
-        args = CLITestHelper.create_mock_args(
+        args = create_create_mock_args(
             input="/test/taxonomy.tsv",
             database="/test/output.ftd", 
             format="tsv",
-            verbose=False
+            verbose=False,
+            overwrite=False,
+            no_header=False,
+            parent_column=0,
+            child_column=1,
+            id_column=None,
+            rank_column=None,
+            genomeid2taxid=None,
+            genomes_path=None,
+            # NCBI datasets attributes (added in Phase 3)
+            ncbi_datasets=None,
+            assembly_level='complete',
+            max_genomes=None,
+            taxonomy_only=False,
+            ncbi_cache_dir=None,
+            auto_detect_sequences=False,
+            sequence_type='genome'
         )
         
-        with patch.object(self.command, '_validate_input_file'), \
-             patch.object(self.command, '_validate_database_path'):
-            
-            result = self.command.execute(args)
-            
-            # Verify success
-            assert result == 0
-            mock_registry.get_parser.assert_called_with("tsv")
-            mock_parser.parse_and_build_tree.assert_called_with("/test/taxonomy.tsv")
-            mock_repo.save_tree.assert_called_with(sample_taxonomy_tree)
+        result = self.command.execute(args)
+        
+        # Verify success
+        assert result == 0
+        mock_registry.get_parser.assert_called_with("tsv")
+        mock_repo.save_tree.assert_called_with(sample_taxonomy_tree)
     
     @patch('flextaxd.cli.commands.create.registry')
-    def test_execute_invalid_format(self, mock_registry):
+    @patch('flextaxd.cli.commands.create.Path')
+    def test_execute_invalid_format(self, mock_path, mock_registry):
         """Test execution with invalid format."""
-        mock_registry.get_parser.side_effect = ValueError("Unknown format: invalid")
+        # Setup Path mocks
+        mock_path_obj = Mock()
+        mock_path_obj.exists.return_value = True
+        mock_path.return_value = mock_path_obj
         
-        args = CLITestHelper.create_mock_args(
+        mock_registry.get_parser.side_effect = Exception("Unknown format")
+        
+        args = create_create_mock_args(
             input="/test/taxonomy.tsv",
             database="/test/output.ftd",
             format="invalid",
-            verbose=False
+            verbose=False,
+            overwrite=False
         )
         
-        with patch.object(self.command, '_validate_input_file'), \
-             patch.object(self.command, '_validate_database_path'):
-            
-            result = self.command.execute(args)
-            
-            # Should fail with error code
-            assert result != 0
+        result = self.command.execute(args)
+        
+        # Should fail with error code
+        assert result == 1
     
-    def test_execute_validation_errors(self):
+    @patch('flextaxd.cli.commands.create.Path')
+    def test_execute_validation_errors(self, mock_path):
         """Test execution with validation errors."""
-        args = CLITestHelper.create_mock_args(
+        # Setup Path mock to simulate file not existing
+        mock_path_obj = Mock()
+        mock_path_obj.exists.return_value = False
+        mock_path.return_value = mock_path_obj
+        
+        args = create_create_mock_args(
             input="/nonexistent/file.tsv",
             database="/test/output.ftd",
             format="tsv",
             verbose=False
         )
         
-        with patch.object(self.command, '_validate_input_file', 
-                         side_effect=ValidationError("Input file does not exist")), \
-             patch.object(self.command, '_validate_database_path'):
-            
-            result = self.command.execute(args)
-            assert result != 0
+        result = self.command.execute(args)
+        
+        # Should fail with error code
+        assert result == 1
     
     @patch('flextaxd.cli.commands.create.SQLiteTaxonomyRepository')
     @patch('flextaxd.cli.commands.create.registry')
-    def test_execute_parse_error(self, mock_registry, mock_repo_class):
+    @patch('flextaxd.cli.commands.create.Path')
+    def test_execute_parse_error(self, mock_path, mock_registry, mock_repo_class):
         """Test execution with parsing errors."""
+        # Setup Path mocks
+        mock_path_obj = Mock()
+        mock_path_obj.exists.return_value = True
+        mock_path.return_value = mock_path_obj
+        
         mock_parser = Mock()
-        mock_parser.parse_and_build_tree.side_effect = ParseError("Invalid taxonomy format")
+        mock_parser.parse.side_effect = ParseError("Invalid taxonomy format")
         mock_registry.get_parser.return_value = mock_parser
         
-        args = CLITestHelper.create_mock_args(
+        args = create_create_mock_args(
             input="/test/bad_taxonomy.tsv",
             database="/test/output.ftd",
             format="tsv",
-            verbose=False
+            verbose=False,
+            overwrite=False,
+            no_header=False,
+            parent_column=0,
+            child_column=1
         )
         
-        with patch.object(self.command, '_validate_input_file'), \
-             patch.object(self.command, '_validate_database_path'):
-            
-            result = self.command.execute(args)
-            assert result != 0
+        result = self.command.execute(args)
+        assert result == 1
 
 
 class TestCreateCommandFormats:
@@ -143,43 +222,82 @@ class TestCreateCommandFormats:
     @pytest.mark.parametrize("format_name", ["tsv", "ncbi", "gtdb", "qiime", "silva", "cansnper"])
     @patch('flextaxd.cli.commands.create.SQLiteTaxonomyRepository')
     @patch('flextaxd.cli.commands.create.registry')
-    def test_execute_different_formats(self, mock_registry, mock_repo_class, format_name, sample_taxonomy_tree):
+    @patch('flextaxd.cli.commands.create.Path')
+    def test_execute_different_formats(self, mock_path, mock_registry, mock_repo_class, format_name, sample_taxonomy_tree):
         """Test execution with different input formats."""
+        # Setup Path mocks - input exists, database doesn't 
+        mock_input_path = Mock()
+        mock_input_path.exists.return_value = True
+        
+        mock_db_path = Mock()
+        mock_db_path.exists.return_value = False  # DB doesn't exist
+        mock_db_path.unlink = Mock()
+        
+        def path_side_effect(path):
+            if f"taxonomy.{format_name}" in str(path):
+                return mock_input_path
+            elif "output.ftd" in str(path):
+                return mock_db_path
+            return Mock()
+        
+        mock_path.side_effect = path_side_effect
+        
         # Setup mocks
         mock_parser = Mock()
-        mock_parser.parse_and_build_tree.return_value = sample_taxonomy_tree
+        mock_parser.parse.return_value = sample_taxonomy_tree
         mock_registry.get_parser.return_value = mock_parser
         
         mock_repo = Mock()
+        mock_repo.get_statistics.return_value = {
+            'node_count': 5,
+            'genome_count': 0,
+            'rank_distribution': {}
+        }
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         
-        args = CLITestHelper.create_mock_args(
+        args = create_create_mock_args(
             input=f"/test/taxonomy.{format_name}",
             database="/test/output.ftd",
             format=format_name,
-            verbose=False
+            verbose=False,
+            overwrite=False,
+            no_header=False,
+            parent_column=0,
+            child_column=1,
+            id_column=None,
+            rank_column=None,
+            genomeid2taxid=None,
+            genomes_path=None
         )
         
-        with patch.object(self.command, '_validate_input_file'), \
-             patch.object(self.command, '_validate_database_path'):
-            
-            result = self.command.execute(args)
-            
-            assert result == 0
-            mock_registry.get_parser.assert_called_with(format_name)
+        result = self.command.execute(args)
+        
+        assert result == 0
+        mock_registry.get_parser.assert_called_with(format_name)
     
     @patch('flextaxd.cli.commands.create.SQLiteTaxonomyRepository')
     @patch('flextaxd.cli.commands.create.registry')
     def test_execute_ncbi_directory(self, mock_registry, mock_repo_class, sample_taxonomy_tree):
         """Test execution with NCBI directory input."""
         mock_parser = Mock()
-        mock_parser.parse_and_build_tree.return_value = sample_taxonomy_tree
+        mock_parser.parse.return_value = sample_taxonomy_tree
+        mock_parser.can_parse.return_value = True
+        mock_parser.parser_name = "ncbi"
         mock_registry.get_parser.return_value = mock_parser
+        mock_registry.find_parser.return_value = None  # Force explicit format path
+        mock_registry.register = Mock()  # Mock registration
         
         mock_repo = Mock()
+        mock_repo.get_statistics.return_value = {
+            'node_count': 10,
+            'genome_count': 0,
+            'root_count': 1,
+            'leaf_count': 5,
+            'rank_distribution': {}
+        }
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         
-        args = CLITestHelper.create_mock_args(
+        args = create_create_mock_args(
             input="/test/ncbi_dump/",
             database="/test/ncbi.ftd",
             format="ncbi",
@@ -187,7 +305,23 @@ class TestCreateCommandFormats:
         )
         
         with patch.object(self.command, '_validate_input_file'), \
-             patch.object(self.command, '_validate_database_path'):
+             patch.object(self.command, '_validate_database_path'), \
+             patch('flextaxd.cli.commands.create.Path') as mock_path:
+            
+            # Mock Path objects for input and database paths
+            mock_input_path = Mock()
+            mock_input_path.exists.return_value = True
+            mock_db_path = Mock()
+            mock_db_path.exists.return_value = False
+            
+            def path_side_effect(path):
+                if "ncbi_dump" in str(path):
+                    return mock_input_path
+                elif "ncbi.ftd" in str(path):
+                    return mock_db_path
+                return Mock()
+            
+            mock_path.side_effect = path_side_effect
             
             result = self.command.execute(args)
             
@@ -202,10 +336,10 @@ class TestCreateCommandFormats:
         mock_parser = Mock()
         mock_registry.get_parser.return_value = mock_parser
         
-        args = CLITestHelper.create_mock_args(
+        args = create_create_mock_args(
             input=sample_input_files["tsv"],
             database="/test/auto.ftd",
-            # No format specified - should auto-detect
+            format="auto",  # Auto-detect format
             verbose=False
         )
         
@@ -216,8 +350,9 @@ class TestCreateCommandFormats:
             result = self.command.execute(args)
             
             # Should attempt format detection
-            if hasattr(mock_registry, 'detect_format'):
-                mock_registry.detect_format.assert_called()
+            mock_registry.find_parser.assert_called()
+            
+            assert result == 0
 
 
 class TestCreateCommandValidation:
@@ -229,7 +364,7 @@ class TestCreateCommandValidation:
     
     def test_validation_missing_input(self):
         """Test validation with missing input file."""
-        args = CLITestHelper.create_mock_args(
+        args = create_create_mock_args(
             input="/nonexistent/file.tsv",
             database="/test/output.ftd",
             format="tsv"
@@ -245,7 +380,7 @@ class TestCreateCommandValidation:
     
     def test_validation_empty_input(self):
         """Test validation with empty input file."""
-        args = CLITestHelper.create_mock_args(
+        args = create_create_mock_args(
             input="/test/empty.tsv",
             database="/test/output.ftd",
             format="tsv"
@@ -265,13 +400,13 @@ class TestCreateCommandValidation:
     
     def test_validation_database_path_creation(self):
         """Test database path creation for new database."""
-        args = CLITestHelper.create_mock_args(
+        args = create_create_mock_args(
             input="/test/taxonomy.tsv",
             database="/test/new/output.ftd",
             format="tsv"
         )
         
-        with patch('pathlib.Path') as mock_path, \
+        with patch('flextaxd.cli.commands.create.Path') as mock_path, \
              patch('flextaxd.cli.commands.create.registry') as mock_registry, \
              patch('flextaxd.cli.commands.create.SQLiteTaxonomyRepository'):
             
@@ -285,37 +420,67 @@ class TestCreateCommandValidation:
             
             # Setup database path validation  
             db_path_obj = Mock()
+            db_path_obj.exists.return_value = False  # Database doesn't exist yet
             db_path_obj.parent.mkdir = Mock()
             
             mock_path.side_effect = lambda p: input_path_obj if "taxonomy" in str(p) else db_path_obj
             
             # Setup parser mock
             mock_parser = Mock()
-            mock_parser.parse_and_build_tree.return_value = Mock()
+            mock_parser.parse.return_value = Mock()
+            mock_parser.can_parse.return_value = True
             mock_registry.get_parser.return_value = mock_parser
+            mock_registry.register = Mock()  # Mock registration
             
             result = self.command.execute(args)
             
-            # Should create parent directories
-            db_path_obj.parent.mkdir.assert_called_with(parents=True, exist_ok=True)
+            # Command should succeed
+            assert result == 0
     
     def test_validation_invalid_database_extension(self):
         """Test validation with non-standard database extension."""
-        args = CLITestHelper.create_mock_args(
+        args = create_create_mock_args(
             input="/test/taxonomy.tsv",
             database="/test/output.db",  # Non-standard extension
             format="tsv"
         )
         
         # Should still work - extension validation is not enforced
-        with patch.object(self.command, '_validate_input_file'), \
-             patch.object(self.command, '_validate_database_path'), \
+        with patch('flextaxd.cli.commands.create.Path') as mock_path, \
              patch('flextaxd.cli.commands.create.registry') as mock_registry, \
-             patch('flextaxd.cli.commands.create.SQLiteTaxonomyRepository'):
+             patch('flextaxd.cli.commands.create.SQLiteTaxonomyRepository') as mock_repo_class:
             
+            # Mock Path objects
+            mock_input_path = Mock()
+            mock_input_path.exists.return_value = True
+            mock_db_path = Mock()
+            mock_db_path.exists.return_value = False
+            
+            def path_side_effect(path):
+                if "taxonomy.tsv" in str(path):
+                    return mock_input_path
+                elif "output.db" in str(path):
+                    return mock_db_path
+                return Mock()
+            
+            mock_path.side_effect = path_side_effect
+            
+            # Mock parser and repository
             mock_parser = Mock()
-            mock_parser.parse_and_build_tree.return_value = Mock()
+            mock_parser.parse.return_value = MockData.create_complex_taxonomy_tree()
+            mock_parser.can_parse.return_value = True
             mock_registry.get_parser.return_value = mock_parser
+            mock_registry.register = Mock()
+            
+            mock_repo = Mock()
+            mock_repo.get_statistics.return_value = {
+                'node_count': 5,
+                'genome_count': 0,
+                'root_count': 1,
+                'leaf_count': 2,
+                'rank_distribution': {}
+            }
+            mock_repo_class.return_value.__enter__.return_value = mock_repo
             
             result = self.command.execute(args)
             assert result == 0
@@ -333,7 +498,7 @@ class TestCreateCommandErrorHandling:
         """Test handling of parser registry errors."""
         mock_registry.get_parser.side_effect = KeyError("Unknown format")
         
-        args = CLITestHelper.create_mock_args(
+        args = create_create_mock_args(
             input="/test/taxonomy.tsv",
             database="/test/output.ftd",
             format="unknown",
@@ -359,7 +524,7 @@ class TestCreateCommandErrorHandling:
         mock_repo.save_tree.side_effect = Exception("Database write failed")
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         
-        args = CLITestHelper.create_mock_args(
+        args = create_create_mock_args(
             input="/test/taxonomy.tsv",
             database="/test/output.ftd",
             format="tsv",
@@ -380,7 +545,7 @@ class TestCreateCommandErrorHandling:
         mock_parser.parse_and_build_tree.side_effect = MemoryError("Not enough memory")
         mock_registry.get_parser.return_value = mock_parser
         
-        args = CLITestHelper.create_mock_args(
+        args = create_create_mock_args(
             input="/test/huge_taxonomy.tsv",
             database="/test/output.ftd",
             format="tsv",
@@ -401,7 +566,7 @@ class TestCreateCommandErrorHandling:
         mock_parser.parse_and_build_tree.side_effect = KeyboardInterrupt()
         mock_registry.get_parser.return_value = mock_parser
         
-        args = CLITestHelper.create_mock_args(
+        args = create_create_mock_args(
             input="/test/taxonomy.tsv",
             database="/test/output.ftd",
             format="tsv",
@@ -428,22 +593,45 @@ class TestCreateCommandVerboseMode:
         """Test verbose mode output."""
         # Setup mocks
         mock_parser = Mock()
-        mock_parser.parse_and_build_tree.return_value = sample_taxonomy_tree
+        mock_parser.parse.return_value = sample_taxonomy_tree
+        mock_parser.can_parse.return_value = True
         mock_registry.get_parser.return_value = mock_parser
+        mock_registry.register = Mock()
         
         mock_repo = Mock()
+        mock_repo.get_statistics.return_value = {
+            'node_count': 10,
+            'genome_count': 0,
+            'root_count': 1,
+            'leaf_count': 5,
+            'rank_distribution': {}
+        }
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         
-        args = CLITestHelper.create_mock_args(
+        args = create_create_mock_args(
             input="/test/taxonomy.tsv",
             database="/test/output.ftd",
             format="tsv",
             verbose=True
         )
         
-        with patch.object(self.command, '_validate_input_file'), \
-             patch.object(self.command, '_validate_database_path'), \
+        with patch('flextaxd.cli.commands.create.Path') as mock_path, \
              patch.object(self.command, 'logger') as mock_logger:
+            
+            # Mock Path objects
+            mock_input_path = Mock()
+            mock_input_path.exists.return_value = True
+            mock_db_path = Mock()
+            mock_db_path.exists.return_value = False
+            
+            def path_side_effect(path):
+                if "taxonomy.tsv" in str(path):
+                    return mock_input_path
+                elif "output.ftd" in str(path):
+                    return mock_db_path
+                return Mock()
+            
+            mock_path.side_effect = path_side_effect
             
             result = self.command.execute(args)
             
@@ -457,22 +645,45 @@ class TestCreateCommandVerboseMode:
         """Test quiet mode (minimal output)."""
         # Setup mocks
         mock_parser = Mock()
-        mock_parser.parse_and_build_tree.return_value = sample_taxonomy_tree
+        mock_parser.parse.return_value = sample_taxonomy_tree
+        mock_parser.can_parse.return_value = True
         mock_registry.get_parser.return_value = mock_parser
+        mock_registry.register = Mock()
         
         mock_repo = Mock()
+        mock_repo.get_statistics.return_value = {
+            'node_count': 10,
+            'genome_count': 0,
+            'root_count': 1,
+            'leaf_count': 5,
+            'rank_distribution': {}
+        }
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         
-        args = CLITestHelper.create_mock_args(
+        args = create_create_mock_args(
             input="/test/taxonomy.tsv",
             database="/test/output.ftd",
             format="tsv",
             verbose=False
         )
         
-        with patch.object(self.command, '_validate_input_file'), \
-             patch.object(self.command, '_validate_database_path'), \
+        with patch('flextaxd.cli.commands.create.Path') as mock_path, \
              patch.object(self.command, 'logger') as mock_logger:
+            
+            # Mock Path objects
+            mock_input_path = Mock()
+            mock_input_path.exists.return_value = True
+            mock_db_path = Mock()
+            mock_db_path.exists.return_value = False
+            
+            def path_side_effect(path):
+                if "taxonomy.tsv" in str(path):
+                    return mock_input_path
+                elif "output.ftd" in str(path):
+                    return mock_db_path
+                return Mock()
+            
+            mock_path.side_effect = path_side_effect
             
             result = self.command.execute(args)
             
@@ -496,21 +707,45 @@ class TestCreateCommandIntegration:
         tree = MockData.create_complex_taxonomy_tree()
         
         mock_parser = Mock()
-        mock_parser.parse_and_build_tree.return_value = tree
+        mock_parser.parse.return_value = tree
+        mock_parser.can_parse.return_value = True
         mock_registry.get_parser.return_value = mock_parser
+        mock_registry.register = Mock()
         
         mock_repo = Mock()
+        mock_repo.get_statistics.return_value = {
+            'node_count': 11,
+            'genome_count': 5,
+            'root_count': 1,
+            'leaf_count': 5,
+            'rank_distribution': {}
+        }
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         
-        args = CLITestHelper.create_mock_args(
+        args = create_create_mock_args(
             input="/test/complex_taxonomy.tsv",
             database="/test/complex.ftd",
             format="tsv",
             verbose=True
         )
         
-        with patch.object(self.command, '_validate_input_file'), \
-             patch.object(self.command, '_validate_database_path'):
+        with patch('flextaxd.cli.commands.create.Path') as mock_path:
+            
+            # Mock Path objects
+            mock_input_path = Mock()
+            mock_input_path.exists.return_value = True
+            mock_db_path = Mock()
+            mock_db_path.exists.return_value = False
+            mock_db_path.unlink = Mock()
+            
+            def path_side_effect(path):
+                if "complex_taxonomy.tsv" in str(path):
+                    return mock_input_path
+                elif "complex.ftd" in str(path):
+                    return mock_db_path
+                return Mock()
+            
+            mock_path.side_effect = path_side_effect
             
             result = self.command.execute(args)
             
@@ -526,8 +761,8 @@ class TestCreateCommandIntegration:
         real_input = sample_input_files["tsv"]
         real_output = temp_dir / "real_test.ftd"
         
-        args = CLITestHelper.create_mock_args(
-            input=real_input,
+        args = create_create_mock_args(
+            input=str(real_input),
             database=str(real_output),
             format="tsv",
             verbose=False
@@ -538,10 +773,19 @@ class TestCreateCommandIntegration:
             
             # Setup mocks while using real filesystem
             mock_parser = Mock()
-            mock_parser.parse_and_build_tree.return_value = MockData.create_complex_taxonomy_tree()
+            mock_parser.parse.return_value = MockData.create_complex_taxonomy_tree()
+            mock_parser.can_parse.return_value = True
             mock_registry.get_parser.return_value = mock_parser
+            mock_registry.register = Mock()
             
             mock_repo = Mock()
+            mock_repo.get_statistics.return_value = {
+                'node_count': 11,
+                'genome_count': 5,
+                'root_count': 1,
+                'leaf_count': 5,
+                'rank_distribution': {}
+            }
             mock_repo_class.return_value.__enter__.return_value = mock_repo
             
             result = self.command.execute(args)

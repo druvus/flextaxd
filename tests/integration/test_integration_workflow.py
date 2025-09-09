@@ -78,10 +78,30 @@ Escherichia	Escherichia coli	562	species"""
                 self.genomes_path = None
                 self.auto_detect_sequences = False
                 self.sequence_type = "genome"
-                self.genomeid2taxid = None
-                self.genomes_path = None
-                self.auto_detect_sequences = False
-                self.sequence_type = "genome"
+                # NCBI datasets args (Phase 3 enhancement)
+                self.ncbi_datasets = None
+                self.taxonomy_only = False
+                self.assembly_level = None
+                self.max_genomes = None
+                
+                # Global CLI options (from main parser) - required by all commands
+                self.verbose = 0
+                self.quiet = False
+                self.log_file = None
+                self.command = 'create'
+                
+                # Progress-related options (expected by CLI commands with progress indicators)
+                self.progress_width = 80
+                self.no_eta = False
+                self.no_rate = False
+                self.progress_log = None
+                self.progress_interval = 1.0
+                
+                # Additional command-specific options
+                self.dry_run = False
+                self.force = False
+                self.disable_parallel = False
+                self.max_workers = 4
 
         result = create_cmd.execute(MockArgs())
         assert result == 0
@@ -106,6 +126,31 @@ Escherichia	Escherichia coli	562	species"""
                 self.include_genomes = False
                 self.names_file = None
                 self.nodes_file = None
+                self.skip_validation = True
+                self.validate_files = False
+                self.include_header = True
+                self.separator = "\t"
+                self.legacy_format = None
+                self.classifier = None
+                
+                # Global CLI options (from main parser) - required by all commands
+                self.verbose = 0
+                self.quiet = False
+                self.log_file = None
+                self.command = 'export'
+                
+                # Progress-related options (expected by CLI commands with progress indicators)
+                self.progress_width = 80
+                self.no_eta = False
+                self.no_rate = False
+                self.progress_log = None
+                self.progress_interval = 1.0
+                
+                # Additional command-specific options
+                self.dry_run = False
+                self.force = False
+                self.disable_parallel = False
+                self.max_workers = 4
 
         result = export_cmd.execute(MockExportArgs())
         assert result == 0
@@ -165,6 +210,30 @@ GCF_000002305.1\td__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterob
                 self.genomes_path = None
                 self.auto_detect_sequences = False
                 self.sequence_type = "genome"
+                # NCBI datasets args (Phase 3 enhancement)
+                self.ncbi_datasets = None
+                self.taxonomy_only = False
+                self.assembly_level = None
+                self.max_genomes = None
+                
+                # Global CLI options (from main parser) - required by all commands
+                self.verbose = 0
+                self.quiet = False
+                self.log_file = None
+                self.command = 'create'
+                
+                # Progress-related options (expected by CLI commands with progress indicators)
+                self.progress_width = 80
+                self.no_eta = False
+                self.no_rate = False
+                self.progress_log = None
+                self.progress_interval = 1.0
+                
+                # Additional command-specific options
+                self.dry_run = False
+                self.force = False
+                self.disable_parallel = False
+                self.max_workers = 4
 
         result = create_cmd.execute(MockArgs())
         assert result == 0
@@ -183,6 +252,31 @@ GCF_000002305.1\td__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterob
                 self.include_genomes = False
                 self.names_file = None
                 self.nodes_file = None
+                self.skip_validation = True
+                self.validate_files = False
+                self.include_header = True
+                self.separator = "\t"
+                self.legacy_format = None
+                self.classifier = None
+                
+                # Global CLI options (from main parser) - required by all commands
+                self.verbose = 0
+                self.quiet = False
+                self.log_file = None
+                self.command = 'export'
+                
+                # Progress-related options (expected by CLI commands with progress indicators)
+                self.progress_width = 80
+                self.no_eta = False
+                self.no_rate = False
+                self.progress_log = None
+                self.progress_interval = 1.0
+                
+                # Additional command-specific options
+                self.dry_run = False
+                self.force = False
+                self.disable_parallel = False
+                self.max_workers = 4
 
         result = export_cmd.execute(MockExportArgs())
         assert result == 0
@@ -233,6 +327,30 @@ AB000002\tBacteria;Proteobacteria;Gammaproteobacteria;Enterobacterales;Enterobac
                 self.genomes_path = None
                 self.auto_detect_sequences = False
                 self.sequence_type = "genome"
+                # NCBI datasets args (Phase 3 enhancement)
+                self.ncbi_datasets = None
+                self.taxonomy_only = False
+                self.assembly_level = None
+                self.max_genomes = None
+                
+                # Global CLI options (from main parser) - required by all commands
+                self.verbose = 0
+                self.quiet = False
+                self.log_file = None
+                self.command = 'create'
+                
+                # Progress-related options (expected by CLI commands with progress indicators)
+                self.progress_width = 80
+                self.no_eta = False
+                self.no_rate = False
+                self.progress_log = None
+                self.progress_interval = 1.0
+                
+                # Additional command-specific options
+                self.dry_run = False
+                self.force = False
+                self.disable_parallel = False
+                self.max_workers = 4
 
         result = create_cmd.execute(MockArgs())
         assert result == 0
@@ -251,6 +369,31 @@ AB000002\tBacteria;Proteobacteria;Gammaproteobacteria;Enterobacterales;Enterobac
                 self.include_genomes = False
                 self.names_file = None
                 self.nodes_file = None
+                self.skip_validation = True
+                self.validate_files = False
+                self.include_header = True
+                self.separator = "\t"
+                self.legacy_format = None
+                self.classifier = None
+                
+                # Global CLI options (from main parser) - required by all commands
+                self.verbose = 0
+                self.quiet = False
+                self.log_file = None
+                self.command = 'export'
+                
+                # Progress-related options (expected by CLI commands with progress indicators)
+                self.progress_width = 80
+                self.no_eta = False
+                self.no_rate = False
+                self.progress_log = None
+                self.progress_interval = 1.0
+                
+                # Additional command-specific options
+                self.dry_run = False
+                self.force = False
+                self.disable_parallel = False
+                self.max_workers = 4
 
         result = export_cmd.execute(MockExportArgs())
         assert result == 0
@@ -311,6 +454,30 @@ AB000002\tBacteria;Proteobacteria;Gammaproteobacteria;Enterobacterales;Enterobac
                 self.genomes_path = None
                 self.auto_detect_sequences = False
                 self.sequence_type = "genome"
+                # NCBI datasets args (Phase 3 enhancement)
+                self.ncbi_datasets = None
+                self.taxonomy_only = False
+                self.assembly_level = None
+                self.max_genomes = None
+                
+                # Global CLI options (from main parser) - required by all commands
+                self.verbose = 0
+                self.quiet = False
+                self.log_file = None
+                self.command = 'create'
+                
+                # Progress-related options (expected by CLI commands with progress indicators)
+                self.progress_width = 80
+                self.no_eta = False
+                self.no_rate = False
+                self.progress_log = None
+                self.progress_interval = 1.0
+                
+                # Additional command-specific options
+                self.dry_run = False
+                self.force = False
+                self.disable_parallel = False
+                self.max_workers = 4
 
         result = create_cmd.execute(MockArgs())
         assert result == 0
@@ -357,6 +524,30 @@ AB000002\tBacteria;Proteobacteria;Gammaproteobacteria;Enterobacterales;Enterobac
                 self.genomes_path = None
                 self.auto_detect_sequences = False
                 self.sequence_type = "genome"
+                # NCBI datasets args (Phase 3 enhancement)
+                self.ncbi_datasets = None
+                self.taxonomy_only = False
+                self.assembly_level = None
+                self.max_genomes = None
+                
+                # Global CLI options (from main parser) - required by all commands
+                self.verbose = 0
+                self.quiet = False
+                self.log_file = None
+                self.command = 'create'
+                
+                # Progress-related options (expected by CLI commands with progress indicators)
+                self.progress_width = 80
+                self.no_eta = False
+                self.no_rate = False
+                self.progress_log = None
+                self.progress_interval = 1.0
+                
+                # Additional command-specific options
+                self.dry_run = False
+                self.force = False
+                self.disable_parallel = False
+                self.max_workers = 4
 
         result = create_cmd.execute(MockArgs())
         assert result == 0
@@ -402,10 +593,30 @@ Escherichia	Escherichia coli	562	species"""
                 self.genomes_path = None
                 self.auto_detect_sequences = False
                 self.sequence_type = "genome"
-                self.genomeid2taxid = None
-                self.genomes_path = None
-                self.auto_detect_sequences = False
-                self.sequence_type = "genome"
+                # NCBI datasets args (Phase 3 enhancement)
+                self.ncbi_datasets = None
+                self.taxonomy_only = False
+                self.assembly_level = None
+                self.max_genomes = None
+                
+                # Global CLI options (from main parser) - required by all commands
+                self.verbose = 0
+                self.quiet = False
+                self.log_file = None
+                self.command = 'create'
+                
+                # Progress-related options (expected by CLI commands with progress indicators)
+                self.progress_width = 80
+                self.no_eta = False
+                self.no_rate = False
+                self.progress_log = None
+                self.progress_interval = 1.0
+                
+                # Additional command-specific options
+                self.dry_run = False
+                self.force = False
+                self.disable_parallel = False
+                self.max_workers = 4
 
         result = create_cmd.execute(MockCreateArgs())
         assert result == 0
@@ -428,6 +639,31 @@ Escherichia	Escherichia coli	562	species"""
                     self.include_genomes = False
                     self.names_file = None
                     self.nodes_file = None
+                    self.skip_validation = True
+                    self.validate_files = False
+                    self.include_header = True
+                    self.separator = "\t"
+                    self.legacy_format = None
+                    self.classifier = None
+                    
+                    # Global CLI options (from main parser) - required by all commands
+                    self.verbose = 0
+                    self.quiet = False
+                    self.log_file = None
+                    self.command = 'export'
+                    
+                    # Progress-related options (expected by CLI commands with progress indicators)
+                    self.progress_width = 80
+                    self.no_eta = False
+                    self.no_rate = False
+                    self.progress_log = None
+                    self.progress_interval = 1.0
+                    
+                    # Additional command-specific options
+                    self.dry_run = False
+                    self.force = False
+                    self.disable_parallel = False
+                    self.max_workers = 4
 
             result = export_cmd.execute(MockExportArgs(fmt, output_file))
             assert result == 0, f"Failed to export to {fmt} format"
@@ -495,10 +731,30 @@ Salmonella	Salmonella enterica	28901	species"""
                 self.genomes_path = None
                 self.auto_detect_sequences = False
                 self.sequence_type = "genome"
-                self.genomeid2taxid = None
-                self.genomes_path = None
-                self.auto_detect_sequences = False
-                self.sequence_type = "genome"
+                # NCBI datasets args (Phase 3 enhancement)
+                self.ncbi_datasets = None
+                self.taxonomy_only = False
+                self.assembly_level = None
+                self.max_genomes = None
+                
+                # Global CLI options (from main parser) - required by all commands
+                self.verbose = 0
+                self.quiet = False
+                self.log_file = None
+                self.command = 'create'
+                
+                # Progress-related options (expected by CLI commands with progress indicators)
+                self.progress_width = 80
+                self.no_eta = False
+                self.no_rate = False
+                self.progress_log = None
+                self.progress_interval = 1.0
+                
+                # Additional command-specific options
+                self.dry_run = False
+                self.force = False
+                self.disable_parallel = False
+                self.max_workers = 4
 
         result = create_cmd.execute(MockArgs())
         assert result == 0

@@ -172,6 +172,11 @@ class UnifiedSequenceManager:
         # Get all taxa with genomes
         taxa_with_genomes = self._get_taxa_with_genomes()
         
+        # Apply taxa_limit if specified
+        taxa_limit = kwargs.get('taxa_limit')
+        if taxa_limit and isinstance(taxa_limit, int) and taxa_limit > 0:
+            taxa_with_genomes = taxa_with_genomes[:taxa_limit]
+        
         files_created = []
         proteins_extracted = 0
         taxa_processed = 0
@@ -435,3 +440,64 @@ class UnifiedSequenceManager:
         data['supports_nucleotides'] = True
         
         return data
+    
+    def validate_all_sequences(self, level: str = "standard") -> Dict[str, Any]:
+        """Validate all sequence files with comprehensive checking.
+        
+        Args:
+            level: Validation level - "basic", "standard", or "comprehensive"
+            
+        Returns:
+            Combined validation results from file and integrity checks
+        """
+        results = {}
+        
+        # Get file validation results
+        try:
+            file_results = self.tracker.validate_sequence_files(level=level)
+            results.update(file_results)
+        except AttributeError:
+            # Method doesn't exist, skip
+            pass
+        
+        # Get sequence integrity results for comprehensive validation
+        if level == "comprehensive":
+            try:
+                integrity_results = self.tracker.validate_sequence_integrity()
+                results.update(integrity_results)
+            except AttributeError:
+                # Method doesn't exist, skip
+                pass
+        
+        return results
+    
+    def get_sequence_file_info(self, file_id: int) -> Any:
+        """Get sequence file information by file ID.
+        
+        Args:
+            file_id: The file ID to get info for
+            
+        Returns:
+            SequenceFileInfo object with file details
+        """
+        return self.tracker.get_sequence_file_info(file_id)
+    
+    def update_file_validation_status(self, file_id: int, validation_result: Dict[str, Any]) -> None:
+        """Update file validation status.
+        
+        Args:
+            file_id: The file ID to update
+            validation_result: Dictionary with validation results
+        """
+        self.tracker.update_file_validation_status(file_id, validation_result)
+    
+    def cleanup_missing_files(self, **kwargs) -> Dict[str, Any]:
+        """Clean up missing sequence files.
+        
+        Args:
+            **kwargs: Parameters to pass to the tracker cleanup method
+            
+        Returns:
+            Dictionary with cleanup results
+        """
+        return self.tracker.cleanup_missing_files(**kwargs)

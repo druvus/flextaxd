@@ -24,7 +24,10 @@ class TestNewCLI:
         assert "create" in result.stdout
         assert "export" in result.stdout
         assert "stats" in result.stdout
-        assert "modify" in result.stdout
+        # Check for new focused commands instead of modify
+        assert "add-node" in result.stdout
+        assert "import-tree" in result.stdout
+        assert "add-genome" in result.stdout
 
     def test_cli_version(self):
         """Test version display."""
@@ -48,10 +51,55 @@ class TestNewCLI:
         )
 
         assert result.returncode == 0
-        assert "Create a new taxonomy database" in result.stdout
-        assert "--input" in result.stdout
+        assert "Create taxonomy database from various input sources" in result.stdout
+
+    def test_add_node_command_help(self):
+        """Test add-node command help."""
+        result = subprocess.run(
+            [sys.executable, "-m", "flextaxd.cli", "add-node", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        assert result.returncode == 0
+        assert "Add a new taxonomy node" in result.stdout
+        assert "--name" in result.stdout
+        assert "--parent-id" in result.stdout
+        assert "--parent-name" in result.stdout
+
+    def test_import_tree_command_help(self):
+        """Test import-tree command help."""
+        result = subprocess.run(
+            [sys.executable, "-m", "flextaxd.cli", "import-tree", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        assert result.returncode == 0
+        assert "Import a taxonomy tree from a file" in result.stdout
+        assert "--strategy" in result.stdout
+        assert "--attach-to" in result.stdout
+        assert "--root-node" in result.stdout
+
+    def test_add_genome_command_help(self):
+        """Test add-genome command help."""
+        result = subprocess.run(
+            [sys.executable, "-m", "flextaxd.cli", "add-genome", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        assert result.returncode == 0
+        assert "Add genome to taxonomy node" in result.stdout
+        assert "--genome-id" in result.stdout
+        assert "--tax-id" in result.stdout
+        assert "--tax-name" in result.stdout
+        assert "--file-path" in result.stdout
         assert "--database" in result.stdout
-        assert "--format" in result.stdout
+        assert "--assembly-accession" in result.stdout
 
     def test_stats_command_help(self):
         """Test stats command help."""
@@ -84,19 +132,8 @@ class TestNewCLI:
         assert "--format" in result.stdout
         assert "--output" in result.stdout
 
-    def test_modify_command_help(self):
-        """Test modify command help."""
-        result = subprocess.run(
-            [sys.executable, "-m", "flextaxd.cli", "modify", "--help"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-
-        assert result.returncode == 0
-        assert "Add, remove, or update nodes in a taxonomy database" in result.stdout
-        assert "--add-node" in result.stdout
-        assert "--remove-node" in result.stdout
+    # NOTE: modify command has been removed and replaced with focused commands:
+    # add-node, import-tree, and add-genome. Tests for these are in their respective test files.
 
     @pytest.mark.slow
     def test_create_basic_database(self, sample_taxonomy_file):

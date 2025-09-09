@@ -15,6 +15,7 @@ from ....fixtures.cli.mock_data import MockData, CLITestHelper
 def create_validate_mock_args(**overrides):
     """Create complete mock args for ValidateCommand with all required attributes."""
     defaults = {
+        # Required CLI args
         'database': '/test/db.ftd',
         'level': 'standard',
         'consistency_only': False,
@@ -23,12 +24,28 @@ def create_validate_mock_args(**overrides):
         'output_file': None,
         'format': 'text',
         'max_workers': 4,
-        'verbose': False,
+        
+        # Global CLI options (from main parser)
+        'verbose': 0,
         'quiet': False,
+        'log_file': None,
+        'command': 'validate',
+        
+        # Progress-related options (expected by CLI commands)
+        'progress_width': 80,
+        'no_eta': False,
+        'no_rate': False,
+        'progress_log': None,
+        'progress_interval': 1.0,
+        
+        # Additional command-specific options
+        'dry_run': False,
+        'force': False,
+        'disable_parallel': False,
         'skip_validation': True  # For test isolation
     }
     defaults.update(overrides)
-    return CLITestHelper.create_mock_args(**defaults)
+    return argparse.Namespace(**defaults)
 
 
 class TestValidateCommand:
@@ -52,6 +69,8 @@ class TestValidateCommand:
     def test_execute_standard_validation(self, mock_repo_class):
         """Test standard validation execution."""
         mock_repo = Mock()
+        mock_repo.get_node_count.return_value = 1000
+        mock_repo.get_genome_count.return_value = 100
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         
         # Mock validation results (what validate_all_genomes returns)
@@ -97,6 +116,8 @@ class TestValidateCommand:
     def test_execute_comprehensive_validation(self, mock_repo_class):
         """Test comprehensive validation execution."""
         mock_repo = Mock()
+        mock_repo.get_node_count.return_value = 1000
+        mock_repo.get_genome_count.return_value = 100
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         
         # Mock file validation results (what validate_all_genomes returns)
@@ -142,6 +163,8 @@ class TestValidateCommand:
     def test_execute_consistency_only(self, mock_repo_class):
         """Test consistency-only validation."""
         mock_repo = Mock()
+        mock_repo.get_node_count.return_value = 1000
+        mock_repo.get_genome_count.return_value = 100
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         
         consistency_result = {
@@ -179,6 +202,8 @@ class TestValidateCommand:
     def test_execute_files_only(self, mock_repo_class):
         """Test files-only validation."""
         mock_repo = Mock()
+        mock_repo.get_node_count.return_value = 1000
+        mock_repo.get_genome_count.return_value = 100
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         
         file_result = {
@@ -206,6 +231,8 @@ class TestValidateCommand:
     def test_execute_export_format_validation(self, mock_repo_class):
         """Test export format specific validation."""
         mock_repo = Mock()
+        mock_repo.get_node_count.return_value = 1000
+        mock_repo.get_genome_count.return_value = 100
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         
         export_validation_result = {
@@ -235,6 +262,8 @@ class TestValidateCommand:
     def test_execute_json_output(self, mock_repo_class):
         """Test JSON output format."""
         mock_repo = Mock()
+        mock_repo.get_node_count.return_value = 1000
+        mock_repo.get_genome_count.return_value = 100
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         
         validation_result = {
@@ -270,6 +299,8 @@ class TestValidateCommand:
     def test_execute_with_output_file(self, mock_path, mock_repo_class):
         """Test validation with output file."""
         mock_repo = Mock()
+        mock_repo.get_node_count.return_value = 1000
+        mock_repo.get_genome_count.return_value = 100
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         
         mock_output_path = Mock()
@@ -305,6 +336,8 @@ class TestValidateCommand:
     def test_execute_database_error(self, mock_repo_class):
         """Test handling of database errors."""
         mock_repo = Mock()
+        mock_repo.get_node_count.return_value = 1000
+        mock_repo.get_genome_count.return_value = 100
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         mock_repo_class.side_effect = DatabaseError("Cannot connect to database")
         
@@ -318,6 +351,8 @@ class TestValidateCommand:
     def test_execute_validation_with_issues(self, mock_repo_class):
         """Test validation that finds issues."""
         mock_repo = Mock()
+        mock_repo.get_node_count.return_value = 1000
+        mock_repo.get_genome_count.return_value = 100
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         
         validation_result = {
@@ -371,6 +406,8 @@ class TestValidateCommandEdgeCases:
     def test_execute_invalid_export_format(self, mock_repo_class):
         """Test handling of invalid export format."""
         mock_repo = Mock()
+        mock_repo.get_node_count.return_value = 1000
+        mock_repo.get_genome_count.return_value = 100
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         
         args = create_validate_mock_args(export_format='invalid_format')
@@ -384,6 +421,8 @@ class TestValidateCommandEdgeCases:
     def test_execute_invalid_output_file(self, mock_path, mock_repo_class):
         """Test handling of invalid output file path."""
         mock_repo = Mock()
+        mock_repo.get_node_count.return_value = 1000
+        mock_repo.get_genome_count.return_value = 100
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         
         mock_output_path = Mock()
@@ -400,6 +439,8 @@ class TestValidateCommandEdgeCases:
     def test_execute_basic_validation_success(self, mock_repo_class):
         """Test basic validation with all checks passing."""
         mock_repo = Mock()
+        mock_repo.get_node_count.return_value = 1000
+        mock_repo.get_genome_count.return_value = 100
         mock_repo_class.return_value.__enter__.return_value = mock_repo
         
         validation_result = {

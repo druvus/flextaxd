@@ -42,16 +42,33 @@ class Kraken2Exporter(DirectoryBasedExporter):
         # Configuration options
         compress = kwargs.get("compress", False)
         include_genomes = kwargs.get("include_genomes", True)
+        use_parallel = kwargs.get("use_parallel", True) and tree.node_count > 10000
 
-        # Create taxonomy files
+        # Define file paths
         names_path = output_path / "names.dmp"
         nodes_path = output_path / "nodes.dmp"
+        taxonomy_tab_path = output_path / "taxonomy.tab"
+        seqid_path = output_path / "seqid2taxid.map"
+
+        if use_parallel and self.max_workers > 1:
+            logger.info(f"Using parallel processing with {self.max_workers} workers for large tree")
+            self._export_parallel(tree, output_path, compress, include_genomes)
+        else:
+            logger.info("Using sequential processing")
+            self._export_sequential(tree, output_path, compress, include_genomes)
+
+        logger.info(
+            f"Kraken2 export completed: {names_path}, {nodes_path}, {taxonomy_tab_path}"
+        )
+
+    def _export_sequential(self, tree: TaxonomyTree, output_path: Path, compress: bool, include_genomes: bool) -> None:
+        """Sequential export (original method)."""
+        names_path = output_path / "names.dmp"
+        nodes_path = output_path / "nodes.dmp"
+        taxonomy_tab_path = output_path / "taxonomy.tab"
 
         self._write_names_file(tree, names_path, compress)
         self._write_nodes_file(tree, nodes_path, compress)
-
-        # Create taxonomy.tab file (simplified format)
-        taxonomy_tab_path = output_path / "taxonomy.tab"
         self._write_taxonomy_tab(tree, taxonomy_tab_path, compress)
 
         # Create sequence mapping if genomes are present
@@ -60,9 +77,26 @@ class Kraken2Exporter(DirectoryBasedExporter):
             self._write_seqid_mapping(tree, seqid_path, compress)
             logger.info(f"Created seqid2taxid mapping with {tree.genome_count} entries")
 
-        logger.info(
-            f"Kraken2 export completed: {names_path}, {nodes_path}, {taxonomy_tab_path}"
-        )
+    def _export_parallel(self, tree: TaxonomyTree, output_path: Path, compress: bool, include_genomes: bool) -> None:
+        """Parallel export using multiple workers."""
+        names_path = output_path / "names.dmp"
+        nodes_path = output_path / "nodes.dmp"
+        taxonomy_tab_path = output_path / "taxonomy.tab"
+
+        # Define file writing tasks
+        file_writers = {
+            names_path: lambda: self._write_names_file(tree, names_path, compress),
+            nodes_path: lambda: self._write_nodes_file(tree, nodes_path, compress),
+            taxonomy_tab_path: lambda: self._write_taxonomy_tab(tree, taxonomy_tab_path, compress)
+        }
+
+        # Add sequence mapping task if needed
+        if include_genomes and tree.genome_count > 0:
+            seqid_path = output_path / "seqid2taxid.map"
+            file_writers[seqid_path] = lambda: self._write_seqid_mapping(tree, seqid_path, compress)
+
+        # Write all files in parallel
+        self._write_files_parallel(file_writers)
 
     def _write_names_file(
         self, tree: TaxonomyTree, output_path: Path, compress: bool

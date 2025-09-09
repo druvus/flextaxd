@@ -35,8 +35,8 @@ class GanonExporter(DirectoryBasedExporter):
     - Taxonomy names must be properly escaped for special characters
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, max_workers: int = 4, **kwargs) -> None:
+        super().__init__(max_workers=max_workers, **kwargs)
         self._unique_names: Dict[str, int] = {}
         self._processed_names: Set[str] = set()
 

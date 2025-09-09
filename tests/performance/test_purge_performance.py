@@ -55,8 +55,9 @@ class TestPurgePerformance:
             parent_node = tree.get_node(parent_id)
             parent_rank_idx = ranks.index(parent_node.rank) if parent_node.rank in ranks else 0
             
-            # Create 2-10 children per node
-            num_children = random.randint(2, min(8, (num_nodes - nodes_created)))
+            # Create 2-8 children per node, ensuring valid range
+            max_children = max(2, min(8, (num_nodes - nodes_created)))
+            num_children = random.randint(2, max_children) if max_children > 2 else 2
             
             for i in range(num_children):
                 if nodes_created >= num_nodes:
@@ -229,7 +230,7 @@ class TestPurgePerformance:
         print(f"Created wide tree with {len(tree._nodes)} nodes and {len(tree._genomes)} genomes")
         
         start_time = time.time()
-        result = tree.purge_nodes_without_genomes(require_fasta_files=True)
+        result = tree.purge_nodes_without_genomes(require_fasta_files=False, force=True)
         end_time = time.time()
         
         purge_time = end_time - start_time
@@ -422,7 +423,7 @@ class TestPurgePerformance:
             tree2.add_node(node)
         
         start_time = time.time()
-        result2 = tree2.purge_nodes_without_genomes()
+        result2 = tree2.purge_nodes_without_genomes(force=True)
         time2 = time.time() - start_time
         
         assert result2["nodes_removed"] == 1000

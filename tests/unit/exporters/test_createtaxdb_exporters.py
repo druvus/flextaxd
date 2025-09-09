@@ -434,8 +434,9 @@ class TestCreateTaxDBExportersIntegration:
                 with pytest.raises(ExportError) as exc_info:
                     exporter.export(empty_tree, output_file)
                 
-                # Error message should mention empty tree
-                assert "empty" in str(exc_info.value).lower()
+                # Error message should mention insufficient genomes or empty tree
+                error_message = str(exc_info.value).lower()
+                assert "insufficient genomes" in error_message or "empty" in error_message
 
     def test_all_exporters_create_valid_files(self):
         """Test all CreateTaxDB exporters create valid output files."""

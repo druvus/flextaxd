@@ -542,8 +542,9 @@ For initial taxonomy setup, use 'flextaxd create' with taxonomy files.
         if re.match(r'^GC[FA]_\d{9}\.\d+$', accession):
             return True
         
-        # Nucleotide accessions  
-        if re.match(r'^(NC|NZ|CP|AP|AE|AL|AM|BA|BX|CM|FO|FP|FQ|FR)_\d+\.\d+$', accession):
+        # Nucleotide accessions - more flexible pattern to handle various NCBI formats
+        # Includes NZ_ prefixed accessions like NZ_CP009273.1
+        if re.match(r'^(NC_\d+\.\d+|NZ_[A-Z]{2,4}\d+\.\d+|(CP|AP|AE|AL|AM|BA|BX|CM|FO|FP|FQ|FR)_?\d+\.\d+)$', accession):
             return True
         
         # Protein accessions

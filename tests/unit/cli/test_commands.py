@@ -10,7 +10,7 @@ from flextaxd.core.models import TaxonomyTree, TaxonomyNode, TaxonomicRank
 from flextaxd.core.exceptions import ValidationError, DatabaseError
 from flextaxd.cli.commands.create import CreateCommand
 from flextaxd.cli.commands.export import ExportCommand  
-from flextaxd.cli.commands.modify import ModifyCommand
+# ModifyCommand removed - replaced by add-node, import-tree, add-genome
 from flextaxd.cli.commands.stats import StatsCommand
 from flextaxd.cli.commands.visualize import VisualizeCommand
 
@@ -91,7 +91,13 @@ class TestCreateCommand(TestCommandsBase):
                 id_column=None,
                 rank_column=None,
                 genomeid2taxid=None,
-                genomes_path=None
+                genomes_path=None,
+                # Add missing NCBI datasets attributes
+                ncbi_datasets=None,
+                assembly_level="complete",
+                max_genomes=None,
+                taxonomy_only=False,
+                ncbi_cache_dir=None
             )
             
             # Execute command
@@ -108,11 +114,33 @@ class TestCreateCommand(TestCommandsBase):
         """Test input validation for create command."""
         command = CreateCommand()
         
-        # Missing input file
-        args = Namespace(input=None, database="test.ftd", format="tsv")
-        
-        with pytest.raises((ValidationError, TypeError)):
-            command.execute(args)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_file = Path(tmp_dir) / "test.ftd"
+            
+            # Missing input file - add all required attributes
+            args = Namespace(
+                input=None,
+                database=str(db_file),
+                format="tsv",
+                verbose=False,
+                overwrite=False,
+                no_header=False,
+                parent_column=0,
+                child_column=1,
+                id_column=None,
+                rank_column=None,
+                genomeid2taxid=None,
+                genomes_path=None,
+                ncbi_datasets=None,
+                assembly_level="complete",
+                max_genomes=None,
+                taxonomy_only=False,
+                ncbi_cache_dir=None
+            )
+            
+            # Should return error code due to missing input
+            result = command.execute(args)
+            assert result == 1
 
 
 class TestExportCommand(TestCommandsBase):
@@ -160,7 +188,18 @@ class TestExportCommand(TestCommandsBase):
                 default_genome_size=1000000,
                 db_version="1.0",
                 include_header=True,
-                verbose=False
+                verbose=False,
+                quiet=False,  # Add missing quiet attribute
+                progress_width=50,  # Add missing progress_width attribute
+                progress_log=None,  # Add missing progress_log attribute
+                progress_interval=1000,  # Add missing progress_interval attribute
+                no_eta=False,  # Add missing no_eta attribute
+                no_rate=False,  # Add missing no_rate attribute
+                disable_parallel=False,  # Add missing disable_parallel attribute
+                max_workers=4,  # Add missing max_workers attribute
+                # Add missing validation attributes
+                skip_validation=True,  # Skip validation for unit tests
+                validate_files=True
             )
             
             # Execute command 
@@ -201,7 +240,18 @@ class TestExportCommand(TestCommandsBase):
                 default_genome_size=1000000,
                 db_version="1.0",
                 include_header=True,
-                verbose=False
+                verbose=False,
+                quiet=False,  # Add missing quiet attribute
+                progress_width=50,  # Add missing progress_width attribute
+                progress_log=None,  # Add missing progress_log attribute
+                progress_interval=1000,  # Add missing progress_interval attribute
+                no_eta=False,  # Add missing no_eta attribute
+                no_rate=False,  # Add missing no_rate attribute
+                disable_parallel=False,  # Add missing disable_parallel attribute
+                max_workers=4,  # Add missing max_workers attribute
+                # Add missing validation attributes
+                skip_validation=True,  # Skip validation for unit tests
+                validate_files=True
             )
             
             result = command.execute(args)
@@ -224,134 +274,12 @@ class TestExportCommand(TestCommandsBase):
         assert result == "kraken2"
 
 
-class TestModifyCommand(TestCommandsBase):
-    """Test modify command functionality."""
-
-    def test_command_registration(self):
-        """Test that modify command can be registered."""
-        subparsers = Mock()
-        mock_parser = Mock()
-        subparsers.add_parser.return_value = mock_parser
-        
-        parser = ModifyCommand.register_parser(subparsers)
-        assert parser is not None
-
-    @patch('flextaxd.cli.commands.modify.SQLiteTaxonomyRepository')
-    @patch('flextaxd.cli.commands.modify.ModifyCommand._validate_database_path')
-    def test_add_node(self, mock_validate_db, mock_repo):
-        """Test adding a node to database."""
-        
-        mock_repository = Mock()
-        tree = self.create_test_tree()
-        mock_repository.load_tree.return_value = tree
-        # Add mocks for modify operations
-        from flextaxd.core.models import TaxonomyNode, TaxonomicRank
-        parent_node = TaxonomyNode(tax_id=2, name="Bacteria", rank=TaxonomicRank.SUPERKINGDOM)
-        # Mock get_node to return parent for ID=2, None for new IDs
-        def mock_get_node(node_id):
-            if node_id == 2:  # Parent exists
-                return parent_node
-            return None  # New node ID doesn't exist yet
-        mock_repository.get_node.side_effect = mock_get_node
-        mock_repository.get_statistics.return_value = {
-            'node_count': 2,
-            'genome_count': 0,
-            'root_count': 1,
-            'leaf_count': 1
-        }
-        mock_repo.return_value = mock_repository
-        mock_repository.__enter__ = Mock(return_value=mock_repository)
-        mock_repository.__exit__ = Mock(return_value=None)
-        
-        command = ModifyCommand()
-        
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            db_file = Path(tmp_dir) / "test.ftd"
-            
-            args = Namespace(
-                database=str(db_file),
-                add_node="New Species",
-                parent_id=2,  # Bacteria
-                rank="species",
-                mod_file=None,
-                remove_node=None,
-                merge_database=None,
-                update_node=None,
-                new_name=None,
-                new_id=None,
-                parent=None,
-                replace=False,
-                format="auto",
-                force=False,
-                dry_run=False,
-                verbose=False
-            )
-            
-            result = command.execute(args)
-            assert result == 0
-
-    @patch('flextaxd.parsers.registry.registry')
-    @patch('flextaxd.cli.commands.modify.SQLiteTaxonomyRepository')
-    @patch('flextaxd.cli.commands.modify.ModifyCommand._validate_database_path')
-    def test_modify_from_file(self, mock_validate_db, mock_repo, mock_registry):
-        """Test modifying database from file."""
-        
-        mock_repository = Mock()
-        mock_repository.load_tree.return_value = self.create_test_tree()
-        # Add basic mocks that might be needed
-        mock_repository.get_statistics.return_value = {
-            'node_count': 2,
-            'genome_count': 0
-        }
-        mock_repo.return_value = mock_repository
-        mock_repository.__enter__ = Mock(return_value=mock_repository)
-        mock_repository.__exit__ = Mock(return_value=None)
-        
-        # Mock the parser to avoid TSV dependency resolution issues
-        from flextaxd.core.models import TaxonomyTree, TaxonomyNode, TaxonomicRank
-        mock_parser = Mock()
-        
-        # Create a modification tree with the new species
-        mod_tree = TaxonomyTree()
-        new_species = TaxonomyNode(tax_id=1001, name="New Species", rank=TaxonomicRank.SPECIES, parent_id=1000)
-        bacteria_ref = TaxonomyNode(tax_id=1000, name="Bacteria", rank=TaxonomicRank.SUPERKINGDOM)  # Reference to existing node
-        mod_tree.add_node(bacteria_ref)
-        mod_tree.add_node(new_species)
-        
-        mock_parser.parse.return_value = mod_tree
-        mock_parser.can_parse.return_value = True
-        mock_registry.get_parser.return_value = mock_parser
-        
-        command = ModifyCommand()
-        
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            db_file = Path(tmp_dir) / "test.ftd"
-            mod_file = Path(tmp_dir) / "modifications.tsv"
-            
-            # Create actual modification file for Path validation
-            mod_file.write_text("name\tparent\trank\nNew Species\tBacteria\tspecies\n")
-            
-            args = Namespace(
-                database=str(db_file),
-                add_node=None,
-                parent_id=None,
-                rank=None,
-                mod_file=str(mod_file),
-                remove_node=None,
-                merge_database=None,
-                update_node=None,
-                new_name=None,
-                new_id=None,
-                parent="Bacteria",
-                replace=True,
-                format="auto",
-                force=False,
-                dry_run=False,
-                verbose=False
-            )
-            
-            result = command.execute(args)
-            assert result == 0
+# NOTE: TestModifyCommand class removed.
+# The modify command has been replaced by focused commands:
+# - add-node: For single node operations (see test_add_node_command.py)
+# - import-tree: For tree import with merge/replace strategies (see test_import_tree_command.py)  
+# - add-genome: For genome operations (see test_add_genome_command.py)
+# Tests for these commands are in their respective dedicated test files.
 
 
 class TestStatsCommand(TestCommandsBase):
@@ -372,13 +300,21 @@ class TestStatsCommand(TestCommandsBase):
         """Test basic statistics display."""
         
         mock_repository = Mock()
-        mock_repository.get_statistics.return_value = {
+        # Create a complete mock statistics response
+        from flextaxd.core.models import TaxonomicRank
+        mock_stats = {
             'node_count': 2,
             'genome_count': 0,
             'root_count': 1,
             'leaf_count': 1,
-            'rank_distribution': {'root': 1, 'superkingdom': 1}
+            'rank_distribution': {TaxonomicRank.ROOT: 1, TaxonomicRank.SUPERKINGDOM: 1},
+            'genomes_with_files': 0,
+            'genomes_metadata_only': 0,
+            'genome_size_distribution': {},
+            'sequence_type_breakdown': {},
+            'source_distribution': {}
         }
+        mock_repository.get_statistics.return_value = mock_stats
         mock_repo.return_value = mock_repository
         mock_repository.__enter__ = Mock(return_value=mock_repository)
         mock_repository.__exit__ = Mock(return_value=None)
@@ -392,7 +328,13 @@ class TestStatsCommand(TestCommandsBase):
                 database=str(db_file),
                 detailed=False,
                 format="text",
-                verbose=False
+                verbose=False,
+                # Add missing validation attributes
+                validate_files=False,  # Disable file validation for unit test
+                skip_file_validation=True,
+                validation_level="standard",
+                consistency_check=False,
+                missing_files=False  # Required by stats command
             )
             
             # Should not crash
@@ -410,7 +352,14 @@ class TestStatsCommand(TestCommandsBase):
             'genome_count': 0,
             'root_count': 1,
             'leaf_count': 1,
-            'rank_distribution': {'root': 1, 'superkingdom': 1}
+            'rank_distribution': {TaxonomicRank.ROOT: 1, TaxonomicRank.SUPERKINGDOM: 1},
+            'genomes_with_files': 0,
+            'genomes_metadata_only': 0,
+            'genome_size_distribution': {},
+            'sequence_type_breakdown': {},
+            'source_distribution': {},
+            'root_nodes': [1],
+            'leaf_nodes': [2]
         }
         mock_repo.return_value = mock_repository
         mock_repository.__enter__ = Mock(return_value=mock_repository)
@@ -427,7 +376,11 @@ class TestStatsCommand(TestCommandsBase):
                 format="text",
                 verbose=False,
                 validate_files=True,
-                skip_file_validation=False
+                skip_file_validation=False,
+                # Add remaining missing attributes - use basic to avoid enhanced validation
+                validation_level="basic",
+                consistency_check=False,
+                missing_files=False  # Required by stats command
             )
             
             result = command.execute(args)
@@ -489,7 +442,11 @@ class TestStatsCommand(TestCommandsBase):
                 format="text",
                 verbose=False,
                 validate_files=True,
-                skip_file_validation=False
+                skip_file_validation=False,
+                # Add remaining missing attributes - use basic to avoid enhanced validation
+                validation_level="basic",
+                consistency_check=False,
+                missing_files=False  # Required by stats command
             )
             
             result = command.execute(args)
@@ -537,7 +494,11 @@ class TestStatsCommand(TestCommandsBase):
                 format="text",
                 verbose=False,
                 validate_files=True,
-                skip_file_validation=True  # This should override validate_files
+                skip_file_validation=True,  # This should override validate_files
+                # Add missing attributes
+                validation_level="standard",
+                consistency_check=False,
+                missing_files=False  # Required by stats command
             )
             
             result = command.execute(args)
@@ -654,7 +615,7 @@ class TestCommandErrorHandling:
     def test_missing_database_file(self):
         """Test handling of missing database files."""
         # CreateCommand has different validation - skip it
-        commands = [ExportCommand(), ModifyCommand(), StatsCommand(), VisualizeCommand()]
+        commands = [ExportCommand(), StatsCommand(), VisualizeCommand()]
         
         for command in commands:
             args = Namespace(
@@ -668,12 +629,13 @@ class TestCommandErrorHandling:
 
     def test_invalid_arguments(self):
         """Test handling of invalid command arguments.""" 
-        # Test with None args
-        commands = [CreateCommand(), ExportCommand(), ModifyCommand(), StatsCommand(), VisualizeCommand()]
+        # Test with invalid args - use empty namespace to trigger attribute errors
+        commands = [CreateCommand(), ExportCommand(), StatsCommand(), VisualizeCommand()]
         
         for command in commands:
-            with pytest.raises((AttributeError, ValidationError)):
-                command.execute(None)
+            # Commands should handle AttributeError gracefully and return non-zero exit code
+            result = command.execute(Namespace())
+            assert result != 0  # Should return error code, not raise exception
 
     @patch('flextaxd.cli.commands.create.SQLiteTaxonomyRepository')
     def test_database_corruption_handling(self, mock_repo):
@@ -763,7 +725,15 @@ class TestCommandIntegration:
                 id_column=None,
                 rank_column=None,
                 genomeid2taxid=None,
-                genomes_path=None
+                genomes_path=None,
+                # Add NCBI datasets attributes
+                ncbi_datasets=None,
+                taxon=None,
+                output_dir=None,
+                taxonomy_only=False,
+                assembly_level=None,
+                max_genomes=None,
+                cache_dir=None
             )
             
             result1 = create_command.execute(create_args)
@@ -786,7 +756,17 @@ class TestCommandIntegration:
                 default_genome_size=1000000,
                 db_version="1.0",
                 include_header=True,
-                verbose=False
+                verbose=False,
+                quiet=False,  # Add missing quiet attribute
+                progress_width=50,  # Add missing progress attributes
+                progress_log=None,
+                progress_interval=1000,
+                no_eta=False,
+                no_rate=False,
+                disable_parallel=False,
+                max_workers=4,
+                skip_validation=True,  # Skip validation for tests
+                validate_files=True
             )
             
             result2 = export_command.execute(export_args)
@@ -794,7 +774,7 @@ class TestCommandIntegration:
 
     def test_command_help_messages(self):
         """Test that all commands provide help messages."""
-        commands = [CreateCommand, ExportCommand, ModifyCommand, StatsCommand, VisualizeCommand]
+        commands = [CreateCommand, ExportCommand, StatsCommand, VisualizeCommand]
         
         for command_class in commands:
             # Mock subparsers

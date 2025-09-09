@@ -4,129 +4,138 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
 ## Overview
 
-FlexTaxD is a **production-ready bioinformatics tool** for creating, customizing, and managing taxonomy databases from diverse sources. It provides comprehensive format support, modern CLI design, and robust database operations for bioinformatics workflows.
+FlexTaxD is a bioinformatics tool for creating, customizing, and managing taxonomy databases from diverse sources. The tool provides support for multiple input formats, extensive export capabilities, and database operations suitable for bioinformatics workflows.
 
-## Current Status (2025-09-07)
+## Current Status (2025-09-09)
 
-### ✅ **Completed Features**
+### Implemented Features
 
-#### **Core Functionality**
-- **Database Creation**: Support for 6+ input formats (NCBI, GTDB, TSV, QIIME, SILVA, CanSNPer)
-- **Export System**: 22+ classification tool formats (most comprehensive in the field)
+#### Core Functionality
+- **Database Creation**: Support for 6 input formats (NCBI, GTDB, TSV, QIIME, SILVA, CanSNPer)
+- **Export System**: 22+ classification tool formats supporting major bioinformatics tools
 - **Visualization**: Tree, plot, and Newick format outputs
-- **Statistics**: Detailed database analysis with file validation
+- **Statistics**: Database analysis with file validation capabilities
 - **NCBI Integration**: Direct download via NCBI Datasets API
 
-#### **Recent Enhancements (Phase 4 Completed)**
-- ✅ **Accession-based download system** with flat file structure by default
-- ✅ **MD5 checksum storage** in database for integrity verification  
-- ✅ **Clean metadata management** - automatic removal of NCBI clutter
-- ✅ **Enhanced status reporting** with visual indicators
-- ✅ **Path cleaning** for orphaned file references
+#### Recent Developments
+- **Accession-based download system**: Implementation of precise genome control mechanisms
+- **Data integrity**: MD5 checksum storage and validation 
+- **Metadata management**: Automated cleaning of NCBI metadata
+- **Status reporting**: Enhanced user feedback systems
+- **File path management**: Cleanup of orphaned file references
 
-### ⚠️ **Known Issues & Limitations**
+#### Test Infrastructure Improvements (2025-09-09)
+- **Critical test failures resolved**: Systematic 4-phase debugging approach implemented
+- **CLI Integration Tests**: Export command attribute compatibility fixes
+- **Database Tests**: File validation and connection handling improvements
+- **Sequence Manager Tests**: Method delegation and implementation enhancements
+- **Genome Validator Tests**: Export requirements infrastructure development
+- **Test Suite Stability**: Foundation established for continued development
 
-#### **Test Coverage (Critical Issue)**
-- **Overall coverage**: 13% (981 tests collected)
-- **Missing tests for**: download, assign_accessions, export_mappings, import_accessions, register commands
-- **Zero coverage**: All validation modules, sequence tracking
+### Areas Requiring Attention
 
-#### **Code Organization Issues**
-- **Orphaned code**: ~2000 lines never used (high_performance modules, adaptive_cache, etc.)
-- **Deprecated files**: modify.py.deprecated still present
-- **Duplicate validation**: Multiple overlapping validation systems
-- **Command proliferation**: 20+ commands may overwhelm users
+#### Code Organization
+- **Orphaned modules**: Approximately 2,000 lines of unused code in performance-related modules
+- **Deprecated components**: Legacy files requiring cleanup (modify.py.deprecated)
+- **Validation systems**: Multiple overlapping validation approaches requiring consolidation
+- **Command structure**: Flat command hierarchy with 20+ commands may benefit from logical grouping
 
-#### **Documentation Gaps**
-- **Wiki outdated**: References deprecated modify command
-- **Missing walkthroughs**: New download workflow, accession operations
-- **Inconsistent examples**: Some use old parameter names
+#### Documentation
+- **Wiki maintenance**: References to deprecated functionality require updates
+- **Workflow documentation**: New features lack comprehensive tutorials
+- **API documentation**: Limited in-code documentation for developers
+- **Example consistency**: Parameter references across documentation need standardization
 
-### 🎯 **Immediate Priorities**
+### Development Priorities
 
-1. **Increase test coverage** to >80% for critical paths
-2. **Remove orphaned code** (~2000 lines)
-3. **Update documentation** to match current implementation
-4. **Consolidate validation** into single coherent system
-5. **Restore modify command** or update all references
+#### High Priority
+1. **Code maintenance**: Remove orphaned modules and consolidate validation systems
+2. **Documentation updates**: Align documentation with current implementation
+3. **Test coverage expansion**: Develop comprehensive test suites for newer commands
+4. **Legacy cleanup**: Remove deprecated files and update references
 
-## 📋 **Command Reference**
+#### Medium Priority
+1. **Command organization**: Consider logical grouping for improved user experience
+2. **Performance validation**: Benchmark claims with empirical testing
+3. **Integration enhancements**: Expand capabilities for pipeline integration
 
-### **Database Operations**
+## Command Reference
+
+### Database Operations
 ```bash
-flextaxd create        # Create taxonomy database
-flextaxd stats         # Display statistics
-flextaxd validate      # Validate integrity
-flextaxd purge         # Remove nodes without data
+flextaxd create        # Create taxonomy database from various sources
+flextaxd stats         # Display database statistics and metrics
+flextaxd validate      # Validate database integrity and consistency
+flextaxd purge         # Remove taxonomic nodes without associated data
 ```
 
-### **Data Management**
+### Data Management
 ```bash
-flextaxd import-accessions  # Import accession mappings
-flextaxd download          # Download by accession
-flextaxd register          # Register sequence files
-flextaxd list-missing      # List missing files
+flextaxd import-accessions  # Import accession-to-taxonomy mappings
+flextaxd download          # Download genomes by accession
+flextaxd register          # Register sequence files with database
+flextaxd list-missing      # Identify missing files in database
 ```
 
-### **Export & Visualization**
+### Export and Visualization
 ```bash
-flextaxd export           # Export to classification tools
-flextaxd export-mappings  # Export mapping files
-flextaxd visualize        # Generate visualizations
+flextaxd export           # Export to classification tool formats
+flextaxd export-mappings  # Export standard mapping files
+flextaxd visualize        # Generate tree visualizations
 ```
 
-### **Node Management**
+### Node Management
 ```bash
-flextaxd add-node      # Add single node
-flextaxd add-genome    # Add genome to node
-flextaxd import-tree   # Import taxonomy tree
+flextaxd add-node      # Add individual taxonomic node
+flextaxd add-genome    # Associate genome with taxonomic node
+flextaxd import-tree   # Import complete taxonomy tree
 ```
 
-## 🏗️ **Architecture**
+## Architecture
 
 ```
 flextaxd/
 ├── cli/                  # Command-line interface
-│   └── commands/         # 20+ subcommands
+│   └── commands/         # 20+ subcommands covering database lifecycle
 ├── core/                 # Core data structures
-│   ├── models.py         # TaxonomyTree, TaxonomyNode, GenomeInfo
-│   └── *.py             # (orphaned performance modules to remove)
+│   ├── models.py         # TaxonomyTree, TaxonomyNode, GenomeInfo classes
+│   └── *.py             # Note: Contains orphaned performance modules
 ├── parsers/              # Input format parsers
-│   └── [6 format parsers]
+│   └── [6 format parsers: NCBI, GTDB, TSV, QIIME, SILVA, CanSNPer]
 ├── exporters/            # Output format exporters  
-│   └── [22+ exporters]
+│   └── [22+ exporters supporting major classification tools]
 ├── database/             # Database operations
-│   └── sqlite.py         # Main database layer
-├── validation/           # Validation modules (needs consolidation)
-├── sequence/             # Sequence tracking (new)
-└── utils/                # Utility functions
+│   └── sqlite.py         # SQLite backend with transaction support
+├── validation/           # Validation modules requiring consolidation
+├── sequence/             # Sequence management and file tracking
+└── utils/                # Utility functions for logging and progress
 ```
 
-## 🔧 **Development Guidelines**
+## Development Guidelines
 
-### **When Adding Features**
-1. **Check for existing functionality** - avoid duplication
-2. **Add tests** - maintain >80% coverage for new code
-3. **Update documentation** - keep wiki and help text current
-4. **Use type hints** - maintain type safety
-5. **Follow patterns** - consistency with existing code
+### Implementation Guidelines
+1. **Check existing functionality** - Avoid duplication of capabilities
+2. **Include test coverage** - Maintain testing for new code paths
+3. **Update documentation** - Keep help text and documentation current
+4. **Use type annotations** - Maintain type safety throughout codebase
+5. **Follow established patterns** - Ensure consistency with existing code
 
-### **Testing Requirements**
+### Testing Requirements
 ```bash
-# Run tests before commits
-pytest tests/unit/        # Unit tests
-pytest tests/integration/ # Integration tests
-mypy flextaxd/           # Type checking
-ruff check flextaxd/     # Linting
+# Validation before commits
+pytest tests/unit/        # Unit test execution
+pytest tests/integration/ # Integration test validation
+mypy flextaxd/           # Type checking verification
+ruff check flextaxd/     # Code linting
 ```
 
-### **Common Patterns**
+### Code Patterns
 ```python
 # Database operations
 repository = SQLiteTaxonomyRepository(database_path)
 tree = repository.get_tree()
 
-# Command structure
+# Command implementation
 class MyCommand(BaseCommand):
     @staticmethod
     def register_args(parser):
@@ -143,99 +152,99 @@ except ValidationError as e:
     return 1
 ```
 
-## 📊 **Performance Considerations**
+## Performance Characteristics
 
-### **Current Limitations**
-- Single-threaded operations (except download)
-- Memory-intensive tree operations for large taxonomies
-- SQLite concurrent write limitations
+### Current Limitations
+- Primarily single-threaded operations (download operations support concurrency)
+- Memory requirements scale with taxonomy size for tree operations
+- SQLite backend serializes concurrent write operations
 
-### **Optimization Opportunities**
-- Add multiprocessing for batch operations
-- Implement streaming parsers for large files
-- Consider PostgreSQL for large deployments
-- Add progress bars for long operations
+### Optimization Opportunities
+- Multiprocessing implementation for batch operations
+- Streaming parser development for large file processing
+- PostgreSQL evaluation for large-scale deployments
+- Progress indicator implementation for long-running operations
 
-## 🚨 **Critical Code Sections**
+## Key Code Components
 
-### **Database Schema**
-- `flextaxd/database/sqlite.py`: Main database operations
-- Schema includes: nodes, genomes, accession_mappings tables
-- Recent addition: file_checksum column for integrity
+### Database Schema
+- `flextaxd/database/sqlite.py`: Primary database operations implementation
+- Schema components: nodes, genomes, accession_mappings tables
+- Recent enhancement: file_checksum column for data integrity verification
 
-### **Core Models**
-- `flextaxd/core/models.py`: Data structures
-- Key classes: TaxonomyNode, GenomeInfo, TaxonomyTree
-- Recent addition: file_checksum field in GenomeInfo
+### Core Data Models
+- `flextaxd/core/models.py`: Fundamental data structure definitions
+- Primary classes: TaxonomyNode, GenomeInfo, TaxonomyTree
+- Recent addition: file_checksum field integration in GenomeInfo
 
-### **Download System**
-- `flextaxd/cli/commands/download.py`: Accession-based downloads
-- `flextaxd/utils/ncbi_datasets.py`: NCBI integration
-- Features: flat file structure, MD5 tracking, metadata cleanup
+### Download Infrastructure
+- `flextaxd/cli/commands/download.py`: Accession-based genome acquisition
+- `flextaxd/utils/ncbi_datasets.py`: NCBI Datasets API integration
+- Capabilities: flat file organization, MD5 verification, metadata processing
 
-## 🐛 **Known Bugs**
+## Current Issues
 
-1. **modify command deprecated** but still referenced in documentation
-2. **Test failures** in visualization and modify command tests
-3. **Orphaned imports** causing unnecessary dependencies
-4. **Inconsistent logging** between modules
+1. **Deprecated functionality**: modify command referenced in documentation despite deprecation
+2. **Test infrastructure**: Some test suites resolved, others require attention
+3. **Dependency management**: Orphaned imports creating unnecessary dependencies
+4. **Logging consistency**: Variation in logging approaches across modules
 
-## 📝 **Documentation Status**
+## Documentation Status
 
-### **Up-to-date**
-- Basic usage examples
-- Export format descriptions
-- Database creation workflows
+### Current Documentation
+- Basic usage examples and command references
+- Export format descriptions for classification tools
+- Database creation workflows for various input formats
 
-### **Needs Update**
-- Wiki walkthroughs (reference deprecated commands)
-- Accession-based workflow documentation
-- Validation system documentation
-- Performance tuning guide
+### Documentation Requiring Updates
+- Wiki walkthroughs referencing deprecated command structures
+- Accession-based workflow documentation for new features
+- Validation system documentation reflecting current implementation
+- Performance optimization guidelines for large-scale usage
 
-## 🎯 **Future Enhancements**
+## Development Roadmap
 
-### **High Priority**
-1. Consolidate validation systems
-2. Restore modify command functionality
-3. Add comprehensive test suite
-4. Update all documentation
+### Immediate Actions
+1. Validation system consolidation into unified framework
+2. Deprecated command cleanup and reference updates
+3. Test coverage expansion for newer command implementations
+4. Documentation alignment with current functionality
 
-### **Medium Priority**
-1. Add progress indicators
-2. Implement parallel processing
-3. Add database versioning
-4. Create GUI interface
+### Future Enhancements
+1. Progress indicator implementation for user feedback
+2. Parallel processing evaluation for performance improvements
+3. Database versioning and migration support
+4. User interface development for non-command-line usage
 
-### **Low Priority**
-1. PostgreSQL support
-2. Cloud storage integration
-3. REST API
-4. Docker containerization
+### Long-term Considerations
+1. Alternative database backend evaluation (PostgreSQL)
+2. Cloud storage integration capabilities
+3. API development for programmatic access
+4. Containerization support for deployment flexibility
 
-## 💡 **Tips for Development**
+## Development Best Practices
 
-1. **Start with tests** - Write tests before implementation
-2. **Use existing patterns** - Follow established code structure
-3. **Document changes** - Update help text and wiki
-4. **Check performance** - Profile large operations
-5. **Validate inputs** - Never trust user data
+1. **Test-driven development** - Implement tests alongside functionality
+2. **Pattern consistency** - Follow established architectural principles
+3. **Documentation maintenance** - Keep user-facing documentation current
+4. **Performance monitoring** - Profile operations with realistic datasets
+5. **Input validation** - Implement comprehensive user input validation
 
-## 🔄 **Migration Notes**
+## Migration Information
 
-### **From Old to New CLI**
-- `flextaxd-create` → `flextaxd create`
-- `flextaxd-modify` → deprecated (use add-node, import-tree)
-- Parameters now use `--` prefix consistently
+### Command Structure Evolution
+- Legacy `flextaxd-create` → Current `flextaxd create`
+- Deprecated `flextaxd-modify` → Use `add-node`, `import-tree`
+- Parameter standardization with consistent `--` prefix usage
 
-### **Database Compatibility**
-- Databases created with older versions are compatible
-- New file_checksum column added automatically
-- Backup before major operations recommended
+### Database Compatibility
+- Backward compatibility maintained for databases from previous versions
+- Schema updates applied automatically (e.g., file_checksum column addition)
+- Database backup recommended before major operations
 
-## 📚 **Resources**
+## Resources
 
-- **GitHub**: https://github.com/FOI-Bioinformatics/flextaxd
-- **Wiki**: Available in repository wiki section
-- **Test Data**: wiki/example_data directory
-- **Support**: Create GitHub issues for bugs/features
+- **Repository**: https://github.com/FOI-Bioinformatics/flextaxd
+- **Documentation**: Repository wiki section
+- **Example Data**: Available in wiki/example_data directory
+- **Issue Tracking**: GitHub Issues for bug reports and feature requests

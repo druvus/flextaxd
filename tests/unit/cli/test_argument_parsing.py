@@ -6,10 +6,11 @@ from unittest.mock import Mock, patch
 
 from flextaxd.cli.commands.create import CreateCommand
 from flextaxd.cli.commands.export import ExportCommand 
-from flextaxd.cli.commands.modify import ModifyCommand
+# ModifyCommand removed - replaced by add-node, import-tree, add-genome
 from flextaxd.cli.commands.stats import StatsCommand
 from flextaxd.cli.commands.visualize import VisualizeCommand
 from flextaxd.cli.commands.purge import PurgeCommand
+from flextaxd.cli.main import create_parser
 
 from ...fixtures.cli.conftest import *
 from ...fixtures.cli.mock_data import CLITestHelper
@@ -19,9 +20,8 @@ class TestArgumentParsingBase:
     """Base test class for argument parsing."""
     
     def setup_method(self):
-        """Set up test fixtures."""
-        self.parser = argparse.ArgumentParser()
-        self.subparsers = self.parser.add_subparsers(dest='command')
+        """Set up test fixtures using the actual FlexTaxD CLI parser."""
+        self.parser = create_parser()
     
     def parse_args(self, args_list):
         """Helper to parse arguments and handle errors."""
@@ -37,7 +37,7 @@ class TestCreateCommandArgumentParsing(TestArgumentParsingBase):
     def setup_method(self):
         """Set up create command parser.""" 
         super().setup_method()
-        CreateCommand.register_parser(self.subparsers)
+        # Parser is already set up with all commands by create_parser()
     
     def test_basic_required_arguments(self):
         """Test basic required arguments."""
@@ -67,14 +67,14 @@ class TestCreateCommandArgumentParsing(TestArgumentParsingBase):
     def test_verbose_flag(self):
         """Test verbose flag."""
         args = self.parse_args([
+            '--verbose',
             'create',
             '--input', '/test/input.tsv', 
-            '--database', '/test/output.ftd',
-            '--verbose'
+            '--database', '/test/output.ftd'
         ])
         
         assert args is not None
-        assert args.verbose is True
+        assert args.verbose == 1  # verbose is a count, not boolean
     
     def test_missing_required_arguments(self):
         """Test missing required arguments."""
@@ -93,29 +93,25 @@ class TestCreateCommandArgumentParsing(TestArgumentParsingBase):
         assert args is None
     
     def test_validation_options(self):
-        """Test validation-related options."""
+        """Test validation-related options - basic test since create doesn't have validation flags."""
         args = self.parse_args([
             'create',
             '--input', '/test/input.tsv',
-            '--database', '/test/output.ftd',
-            '--validate',
-            '--strict'
+            '--database', '/test/output.ftd'
         ])
         
         assert args is not None
-        if hasattr(args, 'validate'):
-            assert args.validate is True
-        if hasattr(args, 'strict'):
-            assert args.strict is True
+        assert args.input == '/test/input.tsv'
+        assert args.database == '/test/output.ftd'
     
     def test_short_argument_forms(self):
         """Test short argument forms."""
         args = self.parse_args([
+            '-v',
             'create',
             '-i', '/test/input.tsv',
-            '-d', '/test/output.ftd',
-            '-f', 'ncbi',
-            '-v'
+            '--database', '/test/output.ftd',  # -d doesn't exist, use --database
+            '-f', 'ncbi'
         ])
         
         assert args is not None
@@ -124,7 +120,7 @@ class TestCreateCommandArgumentParsing(TestArgumentParsingBase):
         if hasattr(args, 'format'):
             assert args.format == 'ncbi'
         if hasattr(args, 'verbose'):
-            assert args.verbose is True
+            assert args.verbose == 1
 
 
 class TestExportCommandArgumentParsing(TestArgumentParsingBase):
@@ -133,7 +129,7 @@ class TestExportCommandArgumentParsing(TestArgumentParsingBase):
     def setup_method(self):
         """Set up export command parser."""
         super().setup_method()
-        ExportCommand.register_parser(self.subparsers)
+        # Parser is already set up with all commands by create_parser()
     
     def test_classifier_export(self):
         """Test classifier export arguments."""
@@ -164,17 +160,17 @@ class TestExportCommandArgumentParsing(TestArgumentParsingBase):
         assert args.output == '/test/taxonomy.tsv'
     
     def test_legacy_format_support(self):
-        """Test legacy format support."""
+        """Test format support."""
         args = self.parse_args([
             'export',
             '--database', '/test/db.ftd',
-            '--legacy-format', 'ncbi',
-            '--output', '/test/ncbi_dump/'
+            '--format', 'tsv',
+            '--output', '/test/output.tsv'
         ])
         
         assert args is not None
-        if hasattr(args, 'legacy_format'):
-            assert args.legacy_format == 'ncbi'
+        assert args.format == 'tsv'
+        assert args.output == '/test/output.tsv'
     
     def test_mutually_exclusive_options(self):
         """Test mutually exclusive format options."""
@@ -193,13 +189,13 @@ class TestExportCommandArgumentParsing(TestArgumentParsingBase):
     def test_export_options(self):
         """Test various export options."""
         args = self.parse_args([
+            '--verbose',
             'export',
             '--database', '/test/db.ftd',
             '--classifier', 'diamond',
             '--output', '/test/diamond_db/',
             '--validate',
-            '--compress',
-            '--verbose'
+            '--compress'
         ])
         
         assert args is not None
@@ -207,7 +203,7 @@ class TestExportCommandArgumentParsing(TestArgumentParsingBase):
             assert args.validate is True
         if hasattr(args, 'compress'):
             assert args.compress is True
-        assert args.verbose is True
+        assert args.verbose == 1  # verbose is a count
     
     def test_missing_export_specification(self):
         """Test missing export type specification."""
@@ -215,103 +211,19 @@ class TestExportCommandArgumentParsing(TestArgumentParsingBase):
             'export',
             '--database', '/test/db.ftd',
             '--output', '/test/output/'
-            # No --classifier, --format, or --legacy-format
+            # No --classifier or --format (both are required)
         ])
         
-        # Should still parse but command execution should handle validation
-        assert args is not None
+        # Should fail parsing due to missing required arguments
+        assert args is None
 
 
-class TestModifyCommandArgumentParsing(TestArgumentParsingBase):
-    """Test argument parsing for modify command."""
-    
-    def setup_method(self):
-        """Set up modify command parser."""
-        super().setup_method()
-        ModifyCommand.register_parser(self.subparsers)
-    
-    def test_add_node_arguments(self):
-        """Test add node arguments."""
-        args = self.parse_args([
-            'modify',
-            '--database', '/test/db.ftd',
-            '--add-node', 'New Species',
-            '--parent-id', '123',
-            '--rank', 'species'
-        ])
-        
-        assert args is not None
-        assert args.command == 'modify'
-        assert args.add_node == 'New Species'
-        assert args.parent_id == '123'
-        assert args.rank == 'species'
-    
-    def test_update_node_arguments(self):
-        """Test update node arguments."""
-        args = self.parse_args([
-            'modify',
-            '--database', '/test/db.ftd',
-            '--update-node', '123',
-            '--name', 'Updated Name'
-        ])
-        
-        assert args is not None
-        assert args.update_node == '123'
-        assert args.name == 'Updated Name'
-    
-    def test_delete_node_arguments(self):
-        """Test delete node arguments."""
-        args = self.parse_args([
-            'modify',
-            '--database', '/test/db.ftd',
-            '--delete-node', '123',
-            '--force'
-        ])
-        
-        assert args is not None
-        assert args.delete_node == '123'
-        assert args.force is True
-    
-    def test_mod_file_arguments(self):
-        """Test modification file arguments."""
-        args = self.parse_args([
-            'modify',
-            '--database', '/test/db.ftd',
-            '--mod-file', '/test/modifications.tsv',
-            '--replace'
-        ])
-        
-        assert args is not None
-        assert args.mod_file == '/test/modifications.tsv'
-        assert args.replace is True
-    
-    def test_backup_option(self):
-        """Test backup option."""
-        args = self.parse_args([
-            'modify',
-            '--database', '/test/db.ftd',
-            '--add-node', 'Test Species',
-            '--parent-id', '123',
-            '--rank', 'species',
-            '--backup', '/test/backup.ftd'
-        ])
-        
-        assert args is not None
-        assert args.backup == '/test/backup.ftd'
-    
-    def test_multiple_modification_types(self):
-        """Test handling of multiple modification types."""
-        # Should handle or reject multiple modification actions
-        args = self.parse_args([
-            'modify',
-            '--database', '/test/db.ftd',
-            '--add-node', 'New Species',
-            '--parent-id', '123',
-            '--delete-node', '456',
-            '--rank', 'species'
-        ])
-        
-        # Behavior depends on parser setup - might allow or reject
+# NOTE: TestModifyCommandArgumentParsing class removed.
+# The modify command has been replaced by focused commands:
+# - add-node: For single node operations  
+# - import-tree: For tree import with merge/replace strategies
+# - add-genome: For genome operations
+# Argument parsing tests for these commands are in their respective test files.
 
 
 class TestStatsCommandArgumentParsing(TestArgumentParsingBase):
@@ -320,7 +232,7 @@ class TestStatsCommandArgumentParsing(TestArgumentParsingBase):
     def setup_method(self):
         """Set up stats command parser."""
         super().setup_method()
-        StatsCommand.register_parser(self.subparsers)
+        # Parser is already set up with all commands by create_parser()
     
     def test_basic_stats_arguments(self):
         """Test basic stats arguments."""
@@ -344,46 +256,45 @@ class TestStatsCommandArgumentParsing(TestArgumentParsingBase):
         assert args is not None
         assert args.detailed is True
     
-    def test_output_file(self):
-        """Test output file option."""
+    def test_format_option(self):
+        """Test format option."""
         args = self.parse_args([
             'stats',
             '--database', '/test/db.ftd',
-            '--output', '/test/stats.json'
+            '--format', 'json'
         ])
         
         assert args is not None
-        assert args.output == '/test/stats.json'
+        assert args.format == 'json'
     
-    def test_rank_filtering(self):
-        """Test rank-specific statistics."""
+    def test_validation_level(self):
+        """Test validation level option."""
         args = self.parse_args([
             'stats',
             '--database', '/test/db.ftd',
-            '--rank', 'species'
+            '--validation-level', 'comprehensive'
         ])
         
         assert args is not None
-        if hasattr(args, 'rank'):
-            assert args.rank == 'species'
+        assert args.validation_level == 'comprehensive'
     
     def test_stats_options_combination(self):
         """Test combination of statistics options."""
         args = self.parse_args([
+            '--verbose',
             'stats',
             '--database', '/test/db.ftd',
             '--detailed',
-            '--output', '/test/detailed_stats.json',
-            '--rank', 'genus',
-            '--verbose'
+            '--format', 'json',
+            '--consistency-check'
         ])
         
         assert args is not None
+        assert args.verbose == 1
+        assert args.database == '/test/db.ftd'
         assert args.detailed is True
-        assert args.output == '/test/detailed_stats.json'
-        if hasattr(args, 'rank'):
-            assert args.rank == 'genus'
-        assert args.verbose is True
+        assert args.format == 'json'
+        assert args.consistency_check is True
 
 
 class TestVisualizeCommandArgumentParsing(TestArgumentParsingBase):
@@ -392,7 +303,7 @@ class TestVisualizeCommandArgumentParsing(TestArgumentParsingBase):
     def setup_method(self):
         """Set up visualize command parser."""
         super().setup_method()
-        VisualizeCommand.register_parser(self.subparsers)
+        # Parser is already set up with all commands by create_parser()
     
     def test_basic_visualization_arguments(self):
         """Test basic visualization arguments.""" 
@@ -416,15 +327,13 @@ class TestVisualizeCommandArgumentParsing(TestArgumentParsingBase):
             '--database', '/test/db.ftd',
             '--type', 'plot',
             '--output', '/test/plot.png',
-            '--width', '12',
-            '--height', '8',
-            '--dpi', '300'
+            '--label-size', '12'
         ])
         
         assert args is not None
-        assert args.width == '12'
-        assert args.height == '8'
-        assert args.dpi == '300'
+        assert args.type == 'plot'
+        assert args.output == '/test/plot.png'
+        assert args.label_size == 12
     
     def test_visualization_options(self):
         """Test various visualization options."""
@@ -432,33 +341,28 @@ class TestVisualizeCommandArgumentParsing(TestArgumentParsingBase):
             'visualize',
             '--database', '/test/db.ftd',
             '--type', 'tree',
-            '--output', '/test/tree.png',
             '--max-depth', '5',
-            '--min-genomes', '1',
-            '--show-labels',
-            '--color-by-rank'
+            '--show-ids',
+            '--show-genomes',
+            '--compact'
         ])
         
         assert args is not None
-        if hasattr(args, 'max_depth'):
-            assert args.max_depth == '5'
-        if hasattr(args, 'min_genomes'):
-            assert args.min_genomes == '1'
-        if hasattr(args, 'show_labels'):
-            assert args.show_labels is True
-        if hasattr(args, 'color_by_rank'):
-            assert args.color_by_rank is True
+        assert args.type == 'tree'
+        assert args.max_depth == 5
+        assert args.show_ids is True
+        assert args.show_genomes is True
+        assert args.compact is True
     
     def test_visualization_types(self):
         """Test different visualization types."""
-        viz_types = ['tree', 'plot', 'newick', 'dendrogram', 'circular']
+        viz_types = ['tree', 'plot', 'newick', 'newick_vis']
         
         for viz_type in viz_types:
             args = self.parse_args([
                 'visualize',
                 '--database', '/test/db.ftd',
-                '--type', viz_type,
-                '--output', f'/test/{viz_type}.png'
+                '--type', viz_type
             ])
             
             assert args is not None
@@ -467,27 +371,20 @@ class TestVisualizeCommandArgumentParsing(TestArgumentParsingBase):
     def test_advanced_visualization_options(self):
         """Test advanced visualization options."""
         args = self.parse_args([
+            '--verbose',
             'visualize',
             '--database', '/test/db.ftd',
             '--type', 'plot',
             '--output', '/test/advanced_plot.png',
-            '--font-size', '14',
-            '--color-scheme', 'viridis',
-            '--filter-rank', 'species',
-            '--layout', 'circular',
-            '--verbose'
+            '--clip-labels',
+            '--start-node', 'Bacteria'
         ])
         
         assert args is not None
-        if hasattr(args, 'font_size'):
-            assert args.font_size == '14'
-        if hasattr(args, 'color_scheme'):
-            assert args.color_scheme == 'viridis'
-        if hasattr(args, 'filter_rank'):
-            assert args.filter_rank == 'species'
-        if hasattr(args, 'layout'):
-            assert args.layout == 'circular'
-        assert args.verbose is True
+        assert args.type == 'plot'
+        assert args.output == '/test/advanced_plot.png'
+        assert args.clip_labels is True
+        assert args.start_node == 'Bacteria'
 
 
 class TestPurgeCommandArgumentParsing(TestArgumentParsingBase):
@@ -496,7 +393,7 @@ class TestPurgeCommandArgumentParsing(TestArgumentParsingBase):
     def setup_method(self):
         """Set up purge command parser."""
         super().setup_method()
-        PurgeCommand.register_parser(self.subparsers)
+        # Parser is already set up with all commands by create_parser()
     
     def test_basic_purge_arguments(self):
         """Test basic purge arguments."""
@@ -543,16 +440,15 @@ class TestPurgeCommandArgumentParsing(TestArgumentParsingBase):
         args = self.parse_args([
             'purge',
             '--database', '/test/db.ftd',
-            '--interactive',
-            '--confirm',
+            '--dry-run',
+            '--force',
             '--backup', '/test/safety_backup.ftd'
         ])
         
         assert args is not None
-        if hasattr(args, 'interactive'):
-            assert args.interactive is True
-        if hasattr(args, 'confirm'):
-            assert args.confirm is True
+        assert args.dry_run is True
+        assert args.force is True
+        assert args.backup == '/test/safety_backup.ftd'
 
 
 class TestArgumentValidation:
@@ -607,24 +503,20 @@ class TestArgumentValidation:
     
     def test_numeric_argument_validation(self):
         """Test numeric argument validation."""
-        parser = argparse.ArgumentParser()
-        subparsers = parser.add_subparsers(dest='command')
-        VisualizeCommand.register_parser(subparsers)
+        from flextaxd.cli.main import create_parser
+        parser = create_parser()
         
         # Test valid numeric arguments
         args = parser.parse_args([
             'visualize',
             '--database', '/test/db.ftd',
-            '--type', 'plot', 
-            '--output', '/test/plot.png',
-            '--width', '12',
-            '--height', '8',
-            '--dpi', '300'
+            '--type', 'plot',
+            '--max-depth', '5',
+            '--label-size', '12'
         ])
         
-        assert args.width == '12'
-        assert args.height == '8'
-        assert args.dpi == '300'
+        assert args.max_depth == 5
+        assert args.label_size == 12
     
     def test_choice_argument_validation(self):
         """Test choice argument validation."""
@@ -711,7 +603,9 @@ class TestArgumentErrorHandling:
         commands_and_required = [
             ('create', ['--input', '--database']),
             ('export', ['--database', '--output']),
-            ('modify', ['--database']),
+            ('add-node', ['--database', '--name', '--rank']),
+            ('import-tree', ['--database', '--input']),
+            ('add-genome', ['--database']),
             ('stats', ['--database']),
             ('visualize', ['--database', '--type', '--output']),
             ('purge', ['--database'])
@@ -721,9 +615,15 @@ class TestArgumentErrorHandling:
         subparsers = parser.add_subparsers(dest='command')
         
         # Register all commands
+        from flextaxd.cli.commands.add_node import AddNodeCommand
+        from flextaxd.cli.commands.import_tree import ImportTreeCommand  
+        from flextaxd.cli.commands.add_genome import AddGenomeCommand
+        
         CreateCommand.register_parser(subparsers)
         ExportCommand.register_parser(subparsers)
-        ModifyCommand.register_parser(subparsers)
+        AddNodeCommand.register_parser(subparsers)
+        ImportTreeCommand.register_parser(subparsers)
+        AddGenomeCommand.register_parser(subparsers)
         StatsCommand.register_parser(subparsers)
         VisualizeCommand.register_parser(subparsers)
         PurgeCommand.register_parser(subparsers)
@@ -751,9 +651,13 @@ class TestHelpAndUsage:
     
     def test_command_help_output(self):
         """Test that help output is generated."""
+        from flextaxd.cli.commands.add_node import AddNodeCommand
+        from flextaxd.cli.commands.import_tree import ImportTreeCommand  
+        from flextaxd.cli.commands.add_genome import AddGenomeCommand
+        
         commands = [
-            CreateCommand, ExportCommand, ModifyCommand,
-            StatsCommand, VisualizeCommand, PurgeCommand
+            CreateCommand, ExportCommand, AddNodeCommand,
+            ImportTreeCommand, AddGenomeCommand, StatsCommand, VisualizeCommand, PurgeCommand
         ]
         
         for command_class in commands:
